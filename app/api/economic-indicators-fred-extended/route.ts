@@ -23,15 +23,21 @@ export async function GET(request: Request) {
     };
 
     const seriesId = seriesMap[series || 'cpi'] || 'CPIAUCSL';
-    
-    // Fetch 3 years of data (36 months + 12 for YoY calculation if needed = 48 months)
+    // For CPI use FRED's "Percent Change from Year Ago" (pc1) for official YoY inflation
+    const units = series === 'cpi' ? 'pc1' : undefined;
+    const limit = series === 'cpi' ? '48' : '48';
+    const params = new URLSearchParams({
+      series_id: seriesId,
+      api_key: FRED_API_KEY,
+      file_type: 'json',
+      sort_order: 'desc',
+      limit
+    });
+    if (units) params.set('units', units);
+
     const response = await fetch(
-      `${BASE_URL}?series_id=${seriesId}&api_key=${FRED_API_KEY}&file_type=json&sort_order=desc&limit=48`,
-      {
-        headers: {
-          'Accept': 'application/json',
-        }
-      }
+      `${BASE_URL}?${params.toString()}`,
+      { headers: { Accept: 'application/json' } }
     );
 
     if (!response.ok) {
@@ -41,8 +47,8 @@ export async function GET(request: Request) {
     const data = await response.json();
 
     if (series === 'cpi') {
-      // Calculate YoY inflation rate from CPI
-      const cpiObservations = data.observations
+      // CPI observations are already YoY % (units=pc1)
+      const observations = data.observations
         .filter((obs: any) => obs.value !== '.')
         .map((obs: any) => ({
           date: obs.date,
@@ -50,26 +56,9 @@ export async function GET(request: Request) {
         }))
         .reverse();
 
-      const calculateInflationRate = () => {
-        if (cpiObservations.length < 13) return [];
-        
-        return cpiObservations.slice(12).map((obs: { date: string; value: number }, index: number) => {
-          const currentCPI = obs.value;
-          const yearAgoCPI = cpiObservations[index].value;
-          const inflationRate = ((currentCPI - yearAgoCPI) / yearAgoCPI) * 100;
-          
-          return {
-            date: obs.date,
-            value: inflationRate
-          };
-        });
-      };
-
-      const inflationRates = calculateInflationRate();
-
       return NextResponse.json({
-        current: inflationRates[inflationRates.length - 1]?.value || 0,
-        historical: inflationRates
+        current: observations[observations.length - 1]?.value ?? 0,
+        historical: observations
       });
     } else {
       // For unemployment and fed funds, return data directly

@@ -81,7 +81,13 @@ export default function MarketOverview() {
               {errorMessage && (
                 <p className="text-sm mb-2 text-amber-600 dark:text-amber-400">{errorMessage}</p>
               )}
-              <p className="text-sm">Add FMP_API_KEY to .env.local (get a free key at financialmodelingprep.com)</p>
+              {(!errorMessage || /api key/i.test(errorMessage)) ? (
+                <p className="text-sm">Add FMP_API_KEY to .env.local (get a free key at financialmodelingprep.com)</p>
+              ) : /restricted|subscription|upgrade/i.test(errorMessage) ? (
+                <p className="text-sm">Your FMP plan may not include this endpoint. Consider upgrading or switching endpoints.</p>
+              ) : (
+                <p className="text-sm">Check your FMP key and try again.</p>
+              )}
             </div>
           </CardContent>
         </Card>

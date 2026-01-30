@@ -19,26 +19,28 @@ export async function GET() {
       fedFunds: 'FEDFUNDS'        // Federal Funds Effective Rate
     };
 
-    // Fetch data for all three indicators
-    const fetchSeries = async (seriesId: string) => {
+    // Fetch CPI with FRED's "Percent Change from Year Ago" (pc1) for official YoY inflation
+    const fetchSeries = async (seriesId: string, units?: string) => {
+      const params = new URLSearchParams({
+        series_id: seriesId,
+        api_key: FRED_API_KEY,
+        file_type: 'json',
+        sort_order: 'desc',
+        limit: '36'
+      });
+      if (units) params.set('units', units);
       const response = await fetch(
-        `${BASE_URL}?series_id=${seriesId}&api_key=${FRED_API_KEY}&file_type=json&sort_order=desc&limit=24`,
-        {
-          headers: {
-            'Accept': 'application/json',
-          }
-        }
+        `${BASE_URL}?${params.toString()}`,
+        { headers: { Accept: 'application/json' } }
       );
-
       if (!response.ok) {
         throw new Error(`FRED API error for ${seriesId}: ${response.status}`);
       }
-
       return response.json();
     };
 
     const [cpiData, unemploymentData, fedFundsData] = await Promise.all([
-      fetchSeries(seriesIds.cpi),
+      fetchSeries(seriesIds.cpi, 'pc1'), // YoY % change directly from FRED (~2.7%)
       fetchSeries(seriesIds.unemployment),
       fetchSeries(seriesIds.fedFunds)
     ]);
@@ -63,36 +65,13 @@ export async function GET() {
       };
     };
 
-    // Calculate YoY inflation rate from CPI
-    const cpiObservations = cpiData.observations
-      .filter((obs: any) => obs.value !== '.')
-      .map((obs: any) => ({
-        date: obs.date,
-        value: parseFloat(obs.value)
-      }))
-      .reverse();
-
-    const calculateInflationRate = () => {
-      if (cpiObservations.length < 13) return [];
-      
-      return cpiObservations.slice(12).map((obs: { date: string; value: number }, index: number) => {
-        const currentCPI = obs.value;
-        const yearAgoCPI = cpiObservations[index].value;
-        const inflationRate = ((currentCPI - yearAgoCPI) / yearAgoCPI) * 100;
-        
-        return {
-          date: obs.date,
-          value: inflationRate
-        };
-      });
-    };
-
-    const inflationRates = calculateInflationRate();
+    // CPI is already YoY inflation rate (units=pc1); no manual calculation
+    const cpiTransformed = transformData(cpiData);
 
     const result = {
       cpi: {
-        current: inflationRates[inflationRates.length - 1]?.value || 0,
-        historical: inflationRates
+        current: cpiTransformed.current,
+        historical: cpiTransformed.historical
       },
       unemployment: transformData(unemploymentData),
       federalFundsRate: transformData(fedFundsData)
