@@ -1,0 +1,212 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+
+@layer base {
+  /* Light mode (default) */
+  :root {
+    --background: 0 0% 98%; /* #FAFAFA */
+    --foreground: 0 0% 12%; /* #1E1E1E */
+
+    --card: 0 0% 100%; /* #FFFFFF */
+    --card-foreground: 0 0% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 12%;
+
+    --primary: 211 71% 50%; /* #2A7AD4 */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 96%; /* #F5F5F5 */
+    --secondary-foreground: 0 0% 30%;
+
+    --muted: 0 0% 94%;
+    --muted-foreground: 0 0% 45%;
+
+    --accent: 211 71% 50%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 88%;
+    --input: 0 0% 88%;
+    --ring: 211 71% 50%;
+
+    --radius: 0.75rem;
+  }
+
+  /* Dark mode */
+  .dark {
+    --background: 0 0% 11.8%; /* #1E1E1E */
+    --foreground: 0 0% 92.9%; /* #EDEDED */
+
+    --card: 0 0% 16.5%; /* #2A2A2A */
+    --card-foreground: 0 0% 92.9%; /* #EDEDED */
+
+    --popover: 0 0% 16.5%;
+    --popover-foreground: 0 0% 92.9%;
+
+    --primary: 211 71% 58%; /* #4A90E2 */
+    --primary-foreground: 0 0% 92.9%;
+
+    --secondary: 0 0% 74.5%; /* #BEBEBE */
+    --secondary-foreground: 0 0% 11.8%;
+
+    --muted: 0 0% 20%;
+    --muted-foreground: 0 0% 74.5%;
+
+    --accent: 211 71% 58%;
+    --accent-foreground: 0 0% 92.9%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 25%;
+    --input: 0 0% 25%;
+    --ring: 211 71% 58%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-light;
+    font-family: 'Inter', sans-serif;
+  }
+}
+
+/* Flip Number Animation Styles */
+@layer components {
+  .flip-number {
+    font-variant-numeric: tabular-nums;
+  }
+  
+  .flip-digit-container {
+    overflow: visible;
+    position: relative;
+  }
+  
+  .flip-digit {
+    display: inline-block;
+    transform-origin: center bottom;
+    position: relative;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+  
+  .flip-digit.flipping {
+    animation: flipDown 800ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  
+  @keyframes flipDown {
+    0% {
+      transform: rotateX(0deg) scaleY(1);
+      opacity: 1;
+      filter: brightness(1);
+    }
+    25% {
+      transform: rotateX(-45deg) scaleY(0.85);
+      opacity: 0.9;
+      filter: brightness(0.95);
+    }
+    50% {
+      transform: rotateX(-90deg) scaleY(0.3);
+      opacity: 0.3;
+      filter: brightness(0.7);
+    }
+    51% {
+      transform: rotateX(90deg) scaleY(0.3);
+      opacity: 0.3;
+      filter: brightness(0.7);
+    }
+    75% {
+      transform: rotateX(45deg) scaleY(0.85);
+      opacity: 0.9;
+      filter: brightness(0.95);
+    }
+    100% {
+      transform: rotateX(0deg) scaleY(1);
+      opacity: 1;
+      filter: brightness(1);
+    }
+  }
+  
+  /* Enhanced 3D effect with shadow during flip */
+  .flip-digit.flipping::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.1) 0%,
+      transparent 50%,
+      rgba(0, 0, 0, 0.1) 100%
+    );
+    pointer-events: none;
+    opacity: 0;
+    animation: shadowFade 800ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  
+  @keyframes shadowFade {
+    0%, 100% {
+      opacity: 0;
+    }
+    50% {
+      opacity: 0.4;
+    }
+  }
+  
+  /* Smooth staggered animation for multi-digit numbers */
+  .flip-number .flip-digit-container:nth-child(1) .flipping { animation-delay: 0ms; }
+  .flip-number .flip-digit-container:nth-child(2) .flipping { animation-delay: 60ms; }
+  .flip-number .flip-digit-container:nth-child(3) .flipping { animation-delay: 120ms; }
+  .flip-number .flip-digit-container:nth-child(4) .flipping { animation-delay: 180ms; }
+  .flip-number .flip-digit-container:nth-child(5) .flipping { animation-delay: 240ms; }
+  .flip-number .flip-digit-container:nth-child(6) .flipping { animation-delay: 300ms; }
+  .flip-number .flip-digit-container:nth-child(7) .flipping { animation-delay: 360ms; }
+  .flip-number .flip-digit-container:nth-child(8) .flipping { animation-delay: 420ms; }
+  .flip-number .flip-digit-container:nth-child(9) .flipping { animation-delay: 480ms; }
+  .flip-number .flip-digit-container:nth-child(10) .flipping { animation-delay: 540ms; }
+  .flip-number .flip-digit-container:nth-child(11) .flipping { animation-delay: 600ms; }
+  .flip-number .flip-digit-container:nth-child(12) .flipping { animation-delay: 660ms; }
+  
+  /* Price Ticker Carousel Animation */
+  @keyframes scroll {
+    0% {
+      transform: translateX(0);
+    }
+    100% {
+      transform: translateX(-50%);
+    }
+  }
+  
+  .animate-scroll {
+    animation: scroll 60s linear infinite;
+  }
+  
+  .animate-scroll:hover {
+    animation-play-state: paused;
+  }
+
+  /* Skip link: visually hidden until focused (accessibility) */
+  .skip-link {
+    @apply absolute left-4 z-[9999] rounded-md bg-primary px-4 py-2 text-primary-foreground outline-none ring-2 ring-ring;
+    top: -100%;
+    transition: top 0.15s ease;
+  }
+  .skip-link:focus {
+    top: 1rem;
+  }
+}
+
+
+
+
