@@ -64,7 +64,7 @@ export default function RelatedStocks({ symbol, sector, compact = false }: Relat
         .slice(0, 4);
 
       // Fetch data for each stock (without historical data to save API credits)
-      const stockPromises = symbols.map(async (sym) => {
+      const stockPromises = symbols.map(async (sym): Promise<RelatedStock | null> => {
         try {
           const response = await fetch(`/api/stock-details?symbol=${sym}&includeHistorical=false`);
           const data = await response.json();
