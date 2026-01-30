@@ -32,6 +32,7 @@ export async function GET() {
       );
     }
 
+    const logoBase = 'https://financialmodelingprep.com/image-stock';
     const stocks = data
       .filter((q: any) => q?.symbol && q?.price != null)
       .map((q: any) => {
@@ -39,13 +40,15 @@ export async function GET() {
         const prevClose = parseFloat(q.previousClose ?? q.price);
         const change = price - prevClose;
         const changePercent = prevClose !== 0 ? (change / prevClose) * 100 : 0;
+        const symbol = q.symbol;
         return {
-          symbol: q.symbol,
+          symbol,
           name: q.name || q.symbol,
           price,
           change,
           changePercent,
-          volume: parseInt(q.volume ?? 0, 10) || 0
+          volume: parseInt(q.volume ?? 0, 10) || 0,
+          image: `${logoBase}/${symbol}.png`
         };
       });
 

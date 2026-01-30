@@ -12,6 +12,7 @@ interface RelatedStock {
   price: number;
   change: number;
   changePercent: number;
+  image?: string;
 }
 
 interface RelatedStocksProps {
@@ -74,7 +75,8 @@ export default function RelatedStocks({ symbol, sector, compact = false }: Relat
               name: data.name,
               price: data.price,
               change: data.change,
-              changePercent: data.changePercent
+              changePercent: data.changePercent,
+              image: data.image
             };
           }
           return null;
@@ -144,12 +146,22 @@ export default function RelatedStocks({ symbol, sector, compact = false }: Relat
                 )}
               >
                 <div className={compact ? 'flex items-center justify-between gap-0.5 mb-0' : 'flex items-start justify-between mb-2'}>
-                  <p className={cn(
-                    'font-semibold group-hover:text-primary transition-colors truncate',
-                    compact ? 'text-[10px]' : 'text-sm'
-                  )}>
-                    {stock.symbol}
-                  </p>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    {stock.image && (
+                      <img
+                        src={stock.image}
+                        alt=""
+                        className={cn('rounded object-contain bg-muted/50 flex-shrink-0', compact ? 'w-5 h-5' : 'w-7 h-7')}
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    )}
+                    <p className={cn(
+                      'font-semibold group-hover:text-primary transition-colors truncate',
+                      compact ? 'text-[10px]' : 'text-sm'
+                    )}>
+                      {stock.symbol}
+                    </p>
+                  </div>
                   <div className={cn(
                     'flex items-center gap-0.5 shrink-0',
                     isPositive ? 'text-green-500' : 'text-red-500',

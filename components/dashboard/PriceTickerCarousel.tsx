@@ -96,11 +96,12 @@ export default function PriceTickerCarousel() {
                 className="flex items-center gap-4 px-6 border-r border-border/50 flex-shrink-0 cursor-pointer hover:bg-accent/50 transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-inset rounded-sm text-left"
               >
                 <div className="flex items-center gap-2 min-w-[120px]">
-                  {item.type === 'crypto' && item.image && (
+                  {item.image && (
                     <img 
                       src={item.image} 
-                      alt={item.symbol} 
-                      className="w-5 h-5 rounded-full flex-shrink-0"
+                      alt="" 
+                      className="w-5 h-5 rounded object-contain flex-shrink-0 bg-muted/30"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                     />
                   )}
                   <div className="flex flex-col min-w-0">

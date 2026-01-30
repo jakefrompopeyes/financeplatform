@@ -7,6 +7,8 @@ import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { X, TrendingUp, TrendingDown, Star, Clock } from 'lucide-react';
 
+const STOCK_LOGO_BASE = 'https://financialmodelingprep.com/image-stock';
+
 interface WatchlistAsset {
   symbol: string;
   price?: number;
@@ -14,6 +16,7 @@ interface WatchlistAsset {
   changePercent?: number;
   type: 'stock' | 'crypto';
   viewedAt?: number; // timestamp for recently viewed
+  image?: string;
 }
 
 type ViewMode = 'watchlist' | 'recent';
@@ -89,6 +92,7 @@ export default function Watchlist({ onSelectAsset, recentlyViewed = [] }: Watchl
                 const n = p != null ? Number(p) : NaN;
                 return Number.isFinite(n) ? n : undefined;
               })(),
+                image: data.image ?? (asset.type === 'stock' ? `${STOCK_LOGO_BASE}/${asset.symbol}.png` : undefined),
               };
             }
           } else if (asset.type === 'crypto') {
@@ -359,14 +363,32 @@ export default function Watchlist({ onSelectAsset, recentlyViewed = [] }: Watchl
 
                   <div className="pr-6">
                     <div className="flex items-start justify-between mb-1">
-                      <div>
-                        <p className="font-semibold text-sm">{asset.symbol}</p>
-                        <p className="text-xs text-muted-foreground capitalize">
-                          {asset.type}
-                          {viewMode === 'recent' && asset.viewedAt && (
-                            <> · {formatTimeAgo(asset.viewedAt)}</>
-                          )}
-                        </p>
+                      <div className="flex items-center gap-2">
+                        {(asset.type === 'stock' && (asset.image || true)) && (
+                          <img
+                            src={asset.image ?? `${STOCK_LOGO_BASE}/${asset.symbol}.png`}
+                            alt=""
+                            className="w-8 h-8 rounded object-contain bg-muted/50 flex-shrink-0"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          />
+                        )}
+                        {asset.type === 'crypto' && asset.image && (
+                          <img
+                            src={asset.image}
+                            alt=""
+                            className="w-8 h-8 rounded object-contain bg-muted/50 flex-shrink-0"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          />
+                        )}
+                        <div>
+                          <p className="font-semibold text-sm">{asset.symbol}</p>
+                          <p className="text-xs text-muted-foreground capitalize">
+                            {asset.type}
+                            {viewMode === 'recent' && asset.viewedAt && (
+                              <> · {formatTimeAgo(asset.viewedAt)}</>
+                            )}
+                          </p>
+                        </div>
                       </div>
                     </div>
                     

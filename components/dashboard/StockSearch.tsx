@@ -6,6 +6,8 @@ import { Search, X, TrendingUp } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
+const STOCK_LOGO_BASE = 'https://financialmodelingprep.com/image-stock';
+
 interface SearchResult {
   symbol: string;
   name: string;
@@ -13,6 +15,7 @@ interface SearchResult {
   type: string;
   currency: string;
   country: string;
+  image?: string;
 }
 
 interface StockSearchProps {
@@ -196,13 +199,19 @@ export default function StockSearch({ onSelectStock }: StockSearchProps) {
                   <button
                     key={symbol}
                     onClick={() => handleSelectStock(symbol)}
-                    className="w-full px-3 py-2 text-left hover:bg-accent rounded-md transition-all duration-200 animate-in fade-in slide-in-from-top-1"
+                    className="w-full px-3 py-2 text-left hover:bg-accent rounded-md transition-all duration-200 animate-in fade-in slide-in-from-top-1 flex items-center gap-3"
                     style={{ 
                       animationDelay: `${index * 50}ms`,
                       animationDuration: '400ms',
                       animationTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)'
                     }}
                   >
+                    <img
+                      src={`${STOCK_LOGO_BASE}/${symbol}.png`}
+                      alt=""
+                      className="w-8 h-8 rounded object-contain bg-muted/50 flex-shrink-0"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
                     <div className="font-medium text-sm">{symbol}</div>
                   </button>
                 ))}
@@ -228,10 +237,20 @@ export default function StockSearch({ onSelectStock }: StockSearchProps) {
                           animationTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)'
                         }}
                       >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1 min-w-0">
-                            <div className="font-semibold text-sm">{result.symbol}</div>
-                            <div className="text-xs text-muted-foreground truncate">{result.name}</div>
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            {result.image && (
+                              <img
+                                src={result.image}
+                                alt=""
+                                className="w-8 h-8 rounded object-contain bg-muted/50 flex-shrink-0"
+                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                              />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="font-semibold text-sm">{result.symbol}</div>
+                              <div className="text-xs text-muted-foreground truncate">{result.name}</div>
+                            </div>
                           </div>
                           <div className="ml-4 text-right flex-shrink-0">
                             <div className="text-xs text-muted-foreground">{result.exchange}</div>

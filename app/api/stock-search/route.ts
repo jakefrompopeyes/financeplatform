@@ -34,20 +34,25 @@ export async function GET(request: Request) {
     // FMP returns array of results; filter US stocks/ETFs and format
     const items = Array.isArray(data) ? data : data.data || [];
     const majorExchanges = ['NASDAQ', 'NYSE', 'AMEX', 'NYSE ARCA', 'BATS'];
+    const logoBase = 'https://financialmodelingprep.com/image-stock';
     const results = items
       .filter((item: any) => {
         const ex = (item.exchangeShortName || item.exchange || '').toUpperCase();
         return majorExchanges.some((e) => ex.includes(e));
       })
       .slice(0, 10)
-      .map((item: any) => ({
-        symbol: item.symbol || item.ticker,
-        name: item.name || item.instrument_name || item.symbol,
-        exchange: item.exchangeShortName || item.exchange || '',
-        type: item.type || item.instrument_type || 'stock',
-        currency: item.currency || 'USD',
-        country: item.country || 'US'
-      }));
+      .map((item: any) => {
+        const sym = (item.symbol || item.ticker || '').toUpperCase();
+        return {
+          symbol: sym,
+          name: item.name || item.instrument_name || item.symbol,
+          exchange: item.exchangeShortName || item.exchange || '',
+          type: item.type || item.instrument_type || 'stock',
+          currency: item.currency || 'USD',
+          country: item.country || 'US',
+          image: sym ? `${logoBase}/${sym}.png` : undefined
+        };
+      });
 
     return NextResponse.json({ results });
   } catch (error) {

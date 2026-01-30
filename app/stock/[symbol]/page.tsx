@@ -25,6 +25,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, ComposedChart, BarCh
 interface StockDetails {
   symbol: string;
   name: string;
+  image?: string;
   price: number;
   change: number;
   changePercent: number;
@@ -427,10 +428,20 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
             <div>
               <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-4xl font-light">{stockData.symbol}</h1>
-                <span className="px-3 py-1 bg-secondary text-secondary-foreground rounded-full text-sm">
-                  {stockData.exchange}
-                </span>
+                {stockData.image && (
+                  <img
+                    src={stockData.image}
+                    alt=""
+                    className="w-12 h-12 rounded-lg object-contain bg-muted/50 flex-shrink-0"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                )}
+                <div>
+                  <h1 className="text-4xl font-light">{stockData.symbol}</h1>
+                  <span className="px-3 py-1 bg-secondary text-secondary-foreground rounded-full text-sm">
+                    {stockData.exchange}
+                  </span>
+                </div>
               </div>
               <p className="text-xl text-muted-foreground mb-1">{stockData.name}</p>
               <p className="text-sm text-muted-foreground">Currency: {stockData.currency}</p>

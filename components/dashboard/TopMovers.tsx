@@ -13,6 +13,7 @@ interface Stock {
   change: number;
   changePercent: number;
   volume: number;
+  image?: string;
 }
 
 interface MoversData {
@@ -89,17 +90,30 @@ export default function TopMovers() {
 
   const StockRow = ({ stock, rank }: { stock: Stock; rank: number }) => {
     const isPositive = stock.changePercent >= 0;
+    const [logoError, setLogoError] = useState(false);
+    const showLogo = stock.image && !logoError;
     return (
       <Link 
         href={`/stock/${stock.symbol}`}
         className="flex items-center justify-between p-3 rounded-lg hover:bg-secondary/50 transition-colors group"
       >
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className={cn(
-            "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold",
-            isPositive ? "bg-green-500/20 text-green-500" : "bg-red-500/20 text-red-500"
-          )}>
-            {rank}
+          <div className="flex-shrink-0 w-8 h-8 rounded flex items-center justify-center bg-muted/50 overflow-hidden">
+            {showLogo ? (
+              <img
+                src={stock.image}
+                alt=""
+                className="w-full h-full object-contain"
+                onError={() => setLogoError(true)}
+              />
+            ) : (
+              <span className={cn(
+                "text-xs font-semibold",
+                isPositive ? "text-green-500" : "text-red-500"
+              )}>
+                {rank}
+              </span>
+            )}
           </div>
           <div className="flex-1 min-w-0">
             <div className="font-semibold text-foreground group-hover:text-primary transition-colors">

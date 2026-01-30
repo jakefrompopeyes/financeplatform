@@ -29,6 +29,7 @@ export async function GET() {
       );
       const batchData = await batchRes.json();
 
+      const logoBase = 'https://financialmodelingprep.com/image-stock';
       if (Array.isArray(batchData)) {
         const stockItems: TickerItem[] = batchData
           .filter((q: any) => q?.symbol && q?.price != null)
@@ -37,13 +38,15 @@ export async function GET() {
             const prevClose = parseFloat(q.previousClose ?? q.price);
             const change = price - prevClose;
             const changePercent = prevClose !== 0 ? (change / prevClose) * 100 : 0;
+            const symbol = (q.symbol || '').toUpperCase();
             return {
-              symbol: (q.symbol || '').toUpperCase(),
+              symbol,
               name: q.name || q.symbol || '',
               price,
               change,
               changePercent,
-              type: 'stock' as const
+              type: 'stock' as const,
+              image: `${logoBase}/${symbol}.png`
             };
           });
         tickerItems.push(...stockItems);

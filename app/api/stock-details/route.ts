@@ -185,9 +185,13 @@ export async function GET(request: Request) {
     const peComputed = eps != null && eps > 0 ? currentPrice / eps : null;
     const pe = quotePe ?? peFromRatios ?? peFromKeyMetrics ?? (peComputed != null && Number.isFinite(peComputed) ? peComputed : null);
 
+    // FMP company logo URL (no API key required)
+    const logoUrl = `https://financialmodelingprep.com/image-stock/${symbol.toUpperCase()}.png`;
+
     const stockDetails: any = {
       symbol: symbol.toUpperCase(),
       name: quote.name || symbol,
+      image: logoUrl,
       price: currentPrice,
       change,
       changePercent,
