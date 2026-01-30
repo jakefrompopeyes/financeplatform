@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 
 const FMP_API_KEY = process.env.FMP_API_KEY;
+const TWELVE_DATA_API_KEY = process.env.TWELVE_DATA_API_KEY;
 const BASE_URL = 'https://financialmodelingprep.com/stable';
+const TWELVE_BASE_URL = 'https://api.twelvedata.com';
 
 type FetchJsonResult =
   | { ok: true; status: number; data: any }
@@ -32,6 +34,35 @@ async function fetchJson(url: string, revalidateSeconds = 60): Promise<FetchJson
   return { ok: true, status: res.status, data };
 }
 
+function isRestrictedMessage(msg: string): boolean {
+  return /restricted|subscription|upgrade/i.test(msg);
+}
+
+function asNumber(value: any): number | null {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function normalizeQuoteLike(raw: any): { symbol: string; price: number; change: number; changesPercentage: number } | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const symbol = String(raw.symbol || '').toUpperCase();
+  const price = asNumber(raw.price);
+  if (!symbol || price == null) return null;
+
+  const change =
+    asNumber(raw.change) ??
+    asNumber(raw.changes) ??
+    (asNumber(raw.previousClose) != null ? price - asNumber(raw.previousClose)! : 0);
+
+  const changesPercentage =
+    asNumber(raw.changesPercentage) ??
+    asNumber(raw.changePercent) ??
+    asNumber(raw.changePercentage) ??
+    (price - change !== 0 ? (change / (price - change)) * 100 : 0);
+
+  return { symbol, price, change, changesPercentage };
+}
+
 export async function GET() {
   try {
     if (!FMP_API_KEY || FMP_API_KEY === 'your_api_key_here') {
@@ -49,57 +80,84 @@ export async function GET() {
     ];
 
     const symbolsParam = indices.map((i) => i.symbol).join(',');
-    const batch = await fetchJson(
-      `${BASE_URL}/batch-quote?symbols=${symbolsParam}&apikey=${FMP_API_KEY}`,
+    // Prefer short quote endpoints (often less restricted than full quote/batch-quote).
+    // 1) Try batch-quote-short
+    // 2) If restricted, fall back to quote-short per symbol
+    // 3) If FMP is entirely restricted, fall back to Twelve Data if configured
+    let quotes: { symbol: string; price: number; change: number; changesPercentage: number }[] | null = null;
+    let lastError: string | null = null;
+
+    const batchShort = await fetchJson(
+      `${BASE_URL}/batch-quote-short?symbols=${symbolsParam}&apikey=${FMP_API_KEY}`,
       60
     );
-    if (!batch.ok) {
-      return NextResponse.json(
-        { error: batch.error },
-        { status: batch.status === 403 ? 403 : 500 }
-      );
+    if (batchShort.ok) {
+      const data = batchShort.data;
+      if (Array.isArray(data)) {
+        quotes = data
+          .map((x: any) => normalizeQuoteLike(x))
+          .filter((x): x is NonNullable<typeof x> => x != null);
+      } else {
+        const msg =
+          (data && typeof data === 'object' && !Array.isArray(data)
+            ? (data as any)['Error Message'] ?? (data as any).message ?? (data as any).error
+            : null) ?? 'Unexpected response';
+        lastError = String(msg);
+      }
+    } else {
+      lastError = batchShort.error;
     }
 
-    const batchData = batch.data;
-
-    const batchErrorMsg =
-      batchData && typeof batchData === 'object' && !Array.isArray(batchData)
-        ? (batchData as any)['Error Message'] ?? (batchData as any).message ?? (batchData as any).error
-        : null;
-
-    // Some plans restrict batch endpoints. If so, fall back to per-symbol quote.
-    let quotes: any[] | null = null;
-    if (Array.isArray(batchData)) {
-      quotes = batchData;
-    } else if (batchErrorMsg) {
-      const msgStr = typeof batchErrorMsg === 'string' ? batchErrorMsg : String(batchErrorMsg);
-      const isRestricted = /restricted|subscription|upgrade/i.test(msgStr);
-      if (isRestricted) {
+    if (!quotes || quotes.length === 0) {
+      if (lastError && isRestrictedMessage(lastError)) {
         const perSymbol = await Promise.all(
           indices.map((index) =>
-            fetchJson(`${BASE_URL}/quote?symbol=${index.symbol}&apikey=${FMP_API_KEY}`, 60)
+            fetchJson(`${BASE_URL}/quote-short?symbol=${index.symbol}&apikey=${FMP_API_KEY}`, 60)
           )
         );
         quotes = perSymbol
           .map((r) => {
-            if (!r.ok) return null;
+            if (!r.ok) {
+              lastError = r.error;
+              return null;
+            }
             const d = r.data;
-            return Array.isArray(d) ? d[0] : d;
+            const item = Array.isArray(d) ? d[0] : d;
+            return normalizeQuoteLike(item);
           })
           .filter((q): q is NonNullable<typeof q> => q != null);
-      } else {
-        return NextResponse.json(
-          { error: msgStr },
-          { status: batch.status === 403 ? 403 : 500 }
-        );
       }
     }
 
+    if ((!quotes || quotes.length === 0) && TWELVE_DATA_API_KEY && TWELVE_DATA_API_KEY !== 'your_twelve_data_key_here') {
+      const perSymbol = await Promise.all(
+        indices.map(async (index) => {
+          const url = `${TWELVE_BASE_URL}/quote?symbol=${encodeURIComponent(index.symbol)}&apikey=${encodeURIComponent(TWELVE_DATA_API_KEY)}`;
+          const res = await fetch(url, { next: { revalidate: 60 } });
+          const data = await res.json().catch(() => null);
+          // Twelve Data returns { code, message } on error
+          if (!res.ok || (data && typeof data === 'object' && (data as any).code)) {
+            lastError = (data as any)?.message ?? `Twelve Data error: HTTP ${res.status}`;
+            return null;
+          }
+          const symbol = String(data.symbol || index.symbol).toUpperCase();
+          const price = asNumber(data.close ?? data.price) ?? asNumber(data.open) ?? null;
+          const change = asNumber(data.change) ?? 0;
+          const changesPercentage = asNumber(data.percent_change) ?? asNumber(data.change_percent) ?? 0;
+          if (!symbol || price == null) return null;
+          return { symbol, price, change, changesPercentage };
+        })
+      );
+      quotes = perSymbol.filter((q): q is NonNullable<typeof q> => q != null);
+    }
+
     if (!quotes || quotes.length === 0) {
+      const msg = lastError || 'Unable to fetch market quotes.';
       return NextResponse.json(
         {
-          error:
-            'No quote data returned. Check your FMP API key at financialmodelingprep.com and ensure your plan includes quote access.'
+          error: msg + (isRestrictedMessage(msg)
+            ? ' If you do not want to upgrade FMP, set TWELVE_DATA_API_KEY to use Twelve Data for market overview.'
+            : '')
         },
         { status: 500 }
       );
@@ -121,16 +179,11 @@ export async function GET() {
 
     const validResults = indices
       .map((index, i) => {
-        const quote = quotes!.find((q: any) => (q.symbol || '').toUpperCase() === index.symbol);
+        const quote = quotes!.find((q) => q.symbol === index.symbol);
         if (!quote) return null;
-        const price = quote.price ?? quote.previousClose;
-        if (price == null) return null;
-
-        const currentPrice = parseFloat(String(price));
-        const previousClose = quote.previousClose != null ? parseFloat(String(quote.previousClose)) : currentPrice;
-        const change = currentPrice - previousClose;
-        const changesPercentage =
-          previousClose !== 0 ? (change / previousClose) * 100 : 0;
+        const currentPrice = quote.price;
+        const change = quote.change;
+        const changesPercentage = quote.changesPercentage;
 
         let historical: { date: string; close: number }[] = [];
         const histList = historicalLists[i] || [];
