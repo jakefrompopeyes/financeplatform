@@ -10,7 +10,7 @@ function toNum(value: unknown): number | null {
 }
 
 /** Normalize a single income statement row from FMP (handles camelCase and snake_case). */
-function normalizeStatement(row: Record<string, unknown>): Record<string, number | null> {
+function normalizeStatement(row: Record<string, unknown>): Record<string, number | string | null> {
   const get = (a: string, b?: string) => toNum(row[a] ?? row[b ?? '']) ?? null;
   const costOfRevenue = get('costOfRevenue', 'cost_of_revenue') ?? get('costOfGoodsSold', 'cost_of_goods_sold');
   return {
@@ -80,10 +80,10 @@ export async function GET(request: Request) {
     const periods: IncomeStatementPeriod[] = data.slice(0, limit).map((row: Record<string, unknown>) => {
       const n = normalizeStatement(row);
       return {
+        ...n,
         period: (row.period ?? row.date ?? '') as string,
         date: typeof row.date === 'string' ? row.date : undefined,
-        ...n,
-      };
+      } as IncomeStatementPeriod;
     });
 
     return NextResponse.json({

@@ -190,7 +190,7 @@ export default function SubscriptionPage() {
               <CardContent>
                 <p className="text-secondary">
                   Yes! You can upgrade or downgrade your plan at any time. Changes take effect immediately, 
-                  and we'll prorate any charges or credits.
+                  and we&apos;ll prorate any charges or credits.
                 </p>
               </CardContent>
             </Card>
@@ -226,7 +226,7 @@ export default function SubscriptionPage() {
               <CardContent>
                 <p className="text-secondary">
                   Each time you open a detailed stock profile page, it counts as one view. Your view count 
-                  resets at the start of each billing cycle. Dashboard data and market overviews don't count 
+                  resets at the start of each billing cycle. Dashboard data and market overviews don&apos;t count 
                   toward your limit.
                 </p>
               </CardContent>

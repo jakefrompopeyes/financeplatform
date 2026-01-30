@@ -100,7 +100,7 @@ export async function GET() {
       // Yield curve spread: use daily, aggregate to monthly for consistency
       if (t10y2yRaw.length > 40) {
         out.yieldCurveSpread = dailyToMonthlyByLastDay(
-          t10y2yRaw.map((d) => ({ date: d.date, value: d.value })),
+          t10y2yRaw as { date: string; value: number }[],
           'value'
         );
       }
@@ -109,7 +109,7 @@ export async function GET() {
       if (m2Raw.length >= 13) {
         out.m2YoY = m2Raw
           .slice(12)
-          .map((_, i) => {
+          .map((_: { date: string; value: number }, i: number) => {
             const current = m2Raw[i + 12].value;
             const yearAgo = m2Raw[i].value;
             return {
@@ -122,7 +122,7 @@ export async function GET() {
       // High yield spread: aggregate daily to monthly
       if (hyRaw.length > 40) {
         out.highYieldSpread = dailyToMonthlyByLastDay(
-          hyRaw.map((d) => ({ date: d.date, value: d.value })),
+          hyRaw as { date: string; value: number }[],
           'value'
         );
       }
@@ -131,7 +131,7 @@ export async function GET() {
     // ---- BTC vs M2 (indexed to 100) ----
     if (btcDaily.length && m2Monthly.length) {
       const btcMonthly = dailyToMonthlyByLastDay(
-        btcDaily.map((d) => ({ date: d.date, value: d.value })),
+        btcDaily as { date: string; value: number }[],
         'value'
       );
       const btcIndexed = indexTo100(btcMonthly);
@@ -167,7 +167,10 @@ export async function GET() {
               }))
               .filter((x: any) => x.date)
               .sort((a: any, b: any) => a.date.localeCompare(b.date));
-            spyMonthly = dailyToMonthlyByLastDay(daily, 'close');
+            spyMonthly = dailyToMonthlyByLastDay(
+              daily as { date: string; close: number }[],
+              'close'
+            );
           }
         }
       } catch (e) {
@@ -194,7 +197,7 @@ export async function GET() {
       const tenYAsMonthly =
         tenYMonthly.length > 40
           ? dailyToMonthlyByLastDay(
-              tenYMonthly.map((d) => ({ date: d.date, value: d.value })),
+              tenYMonthly as { date: string; value: number }[],
               'value'
             )
           : tenYMonthly;

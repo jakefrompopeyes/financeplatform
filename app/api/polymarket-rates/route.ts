@@ -96,7 +96,7 @@ export async function GET() {
         active: market.active ?? true,
         url: market.slug ? `https://polymarket.com/event/${market.slug}` : `https://polymarket.com`
       };
-    }).filter(market => market.probabilities.length > 0); // Only include markets with valid probabilities
+    }).filter((market: { probabilities: unknown[] }) => market.probabilities.length > 0); // Only include markets with valid probabilities
 
     // If no rate-related markets found, return demo data
     if (formattedMarkets.length === 0) {

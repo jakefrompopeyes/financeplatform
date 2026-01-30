@@ -648,10 +648,10 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
                             ))}
                           </Pie>
                           <Tooltip
-                            formatter={(value: number, _name, props: { payload: { name: string } }) =>
+                            formatter={(value: number, _name, props: { payload?: { name: string } }) =>
                               hasPE
-                                ? [formatLargeNumber(value), props.payload.name]
-                                : ['—', props.payload.name]
+                                ? [formatLargeNumber(value), props.payload?.name ?? '']
+                                : ['—', props.payload?.name ?? '']
                             }
                             contentStyle={tooltipStyle}
                             cursor={false}
@@ -690,9 +690,9 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
                               ))}
                             </Pie>
                             <Tooltip
-                              formatter={(value: number, _name, props: { payload: { name: string } }) => [
+                              formatter={(value: number, _name, props: { payload?: { name: string } }) => [
                                 formatLargeNumber(value),
-                                props.payload.name
+                                props.payload?.name ?? ''
                               ]}
                               contentStyle={tooltipStyle}
                               cursor={false}
@@ -732,9 +732,9 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
                               ))}
                             </Pie>
                             <Tooltip
-                              formatter={(value: number, _name, props: { payload: { name: string } }) => [
+                              formatter={(value: number, _name, props: { payload?: { name: string } }) => [
                                 formatLargeNumber(value),
-                                props.payload.name
+                                props.payload?.name ?? ''
                               ]}
                               contentStyle={tooltipStyle}
                               cursor={false}

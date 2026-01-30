@@ -243,7 +243,7 @@ export default function StockSearch({ onSelectStock }: StockSearchProps) {
                   </div>
                 ) : !loading ? (
                   <div className="p-6 text-center text-sm text-muted-foreground animate-in fade-in duration-300">
-                    No stocks found for "{query}"
+                    No stocks found for &quot;{query}&quot;
                   </div>
                 ) : null}
               </>

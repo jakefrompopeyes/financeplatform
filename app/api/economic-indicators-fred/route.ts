@@ -75,7 +75,7 @@ export async function GET() {
     const calculateInflationRate = () => {
       if (cpiObservations.length < 13) return [];
       
-      return cpiObservations.slice(12).map((obs, index) => {
+      return cpiObservations.slice(12).map((obs: { date: string; value: number }, index: number) => {
         const currentCPI = obs.value;
         const yearAgoCPI = cpiObservations[index].value;
         const inflationRate = ((currentCPI - yearAgoCPI) / yearAgoCPI) * 100;

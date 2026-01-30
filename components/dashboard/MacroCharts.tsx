@@ -13,6 +13,10 @@ import {
   ReferenceLine,
 } from 'recharts';
 
+// Recharts components have defaultProps that conflict with React.createElement typing
+const asChartComponent = <P extends Record<string, unknown>>(C: React.ComponentType<P>) =>
+  C as React.ComponentType<Record<string, unknown>>;
+
 type MacroData = {
   btcVsM2?: { date: string; btcIndex: number; m2Index: number }[];
   sp500VsRates?: { date: string; sp500: number; fedFunds: number }[];
@@ -44,8 +48,8 @@ function buildSingleLineChart(
     color: 'hsl(var(--card-foreground))',
   };
   const children: React.ReactNode[] = [
-    React.createElement(CartesianGrid, { key: 'grid', strokeDasharray: '3 3', stroke: gridStroke }),
-    React.createElement(XAxis, {
+    React.createElement(asChartComponent(CartesianGrid), { key: 'grid', strokeDasharray: '3 3', stroke: gridStroke }),
+    React.createElement(asChartComponent(XAxis), {
       key: 'x',
       dataKey: 'date',
       stroke: axisStroke,
@@ -55,20 +59,20 @@ function buildSingleLineChart(
         return `${d.getMonth() + 1}/${String(d.getFullYear()).slice(2)}`;
       },
     }),
-    React.createElement(YAxis, {
+    React.createElement(asChartComponent(YAxis), {
       key: 'y',
       stroke: axisStroke,
       tick: { fontSize: 10 },
       domain: ['auto', 'auto'],
       tickFormatter: (v: number) => `${v}${valueSuffix}`,
     }),
-    React.createElement(Tooltip, {
+    React.createElement(asChartComponent(Tooltip), {
       key: 'tooltip',
       contentStyle: tooltipStyle,
       labelFormatter: (label: string) => new Date(label).toLocaleDateString(),
       formatter: (value: number) => [`${Number(value).toFixed(2)}${valueSuffix}`, null],
     }),
-    React.createElement(Line, {
+    React.createElement(asChartComponent(Line), {
       key: 'line',
       type: 'monotone',
       dataKey: key,
@@ -81,7 +85,7 @@ function buildSingleLineChart(
   ];
   if (refLineY !== null) {
     children.push(
-      React.createElement(ReferenceLine, {
+      React.createElement(asChartComponent(ReferenceLine), {
         key: 'ref',
         y: refLineY,
         stroke: axisStroke,
@@ -97,9 +101,9 @@ function buildSingleLineChart(
       'div',
       { className: contentClass + ' h-56' },
       React.createElement(
-        ResponsiveContainer,
+        ResponsiveContainer as React.ComponentType<{ width?: string; height?: string; children?: React.ReactNode }>,
         { width: '100%', height: '100%' },
-        React.createElement(LineChart, { data, margin: { top: 8, right: 8, left: 0, bottom: 0 } }, children)
+        React.createElement(asChartComponent(LineChart), { data, margin: { top: 8, right: 8, left: 0, bottom: 0 } }, children)
       )
     )
   );
@@ -122,11 +126,11 @@ function buildBtcM2Chart(data: { date: string; btcIndex: number; m2Index: number
       'div',
       { className: contentClass + ' h-56' },
       React.createElement(
-        ResponsiveContainer,
+        ResponsiveContainer as React.ComponentType<{ width?: string; height?: string; children?: React.ReactNode }>,
         { width: '100%', height: '100%' },
-        React.createElement(LineChart, { data, margin: { top: 8, right: 8, left: 0, bottom: 0 } },
-          React.createElement(CartesianGrid, { strokeDasharray: '3 3', stroke: gridStroke }),
-          React.createElement(XAxis, {
+        React.createElement(asChartComponent(LineChart), { data, margin: { top: 8, right: 8, left: 0, bottom: 0 } },
+          React.createElement(asChartComponent(CartesianGrid), { strokeDasharray: '3 3', stroke: gridStroke }),
+          React.createElement(asChartComponent(XAxis), {
             dataKey: 'date',
             stroke: axisStroke,
             tick: { fontSize: 10 },
@@ -135,18 +139,18 @@ function buildBtcM2Chart(data: { date: string; btcIndex: number; m2Index: number
               return `${d.getMonth() + 1}/${String(d.getFullYear()).slice(2)}`;
             },
           }),
-          React.createElement(YAxis, { stroke: axisStroke, tick: { fontSize: 10 }, domain: ['auto', 'auto'] }),
-          React.createElement(Tooltip, {
+          React.createElement(asChartComponent(YAxis), { stroke: axisStroke, tick: { fontSize: 10 }, domain: ['auto', 'auto'] }),
+          React.createElement(asChartComponent(Tooltip), {
             contentStyle: tooltipStyle,
             labelFormatter: (label: string) => new Date(label).toLocaleDateString(),
             formatter: (value: number) => [value.toFixed(1), null],
           }),
-          React.createElement(Legend, {
+          React.createElement(asChartComponent(Legend), {
             wrapperStyle: { fontSize: 11 },
             formatter: (name: string) => (name === 'btcIndex' ? 'BTC' : name === 'm2Index' ? 'M2' : name),
           }),
-          React.createElement(ReferenceLine, { y: 100, stroke: axisStroke, strokeDasharray: '2 2' }),
-          React.createElement(Line, {
+          React.createElement(asChartComponent(ReferenceLine), { y: 100, stroke: axisStroke, strokeDasharray: '2 2' }),
+          React.createElement(asChartComponent(Line), {
             type: 'monotone',
             dataKey: 'btcIndex',
             name: 'btcIndex',
@@ -156,7 +160,7 @@ function buildBtcM2Chart(data: { date: string; btcIndex: number; m2Index: number
             isAnimationActive: true,
             animationDuration: 600,
           }),
-          React.createElement(Line, {
+          React.createElement(asChartComponent(Line), {
             type: 'monotone',
             dataKey: 'm2Index',
             name: 'm2Index',
@@ -189,11 +193,11 @@ function buildSp500RatesChart(data: { date: string; sp500: number; fedFunds: num
       'div',
       { className: contentClass + ' h-56' },
       React.createElement(
-        ResponsiveContainer,
+        ResponsiveContainer as React.ComponentType<{ width?: string; height?: string; children?: React.ReactNode }>,
         { width: '100%', height: '100%' },
-        React.createElement(LineChart, { data, margin: { top: 8, right: 32, left: 0, bottom: 0 } },
-          React.createElement(CartesianGrid, { strokeDasharray: '3 3', stroke: gridStroke }),
-          React.createElement(XAxis, {
+        React.createElement(asChartComponent(LineChart), { data, margin: { top: 8, right: 32, left: 0, bottom: 0 } },
+          React.createElement(asChartComponent(CartesianGrid), { strokeDasharray: '3 3', stroke: gridStroke }),
+          React.createElement(asChartComponent(XAxis), {
             dataKey: 'date',
             stroke: axisStroke,
             tick: { fontSize: 10 },
@@ -202,14 +206,14 @@ function buildSp500RatesChart(data: { date: string; sp500: number; fedFunds: num
               return `${d.getMonth() + 1}/${String(d.getFullYear()).slice(2)}`;
             },
           }),
-          React.createElement(YAxis, {
+          React.createElement(asChartComponent(YAxis), {
             yAxisId: 'left',
             stroke: axisStroke,
             tick: { fontSize: 10 },
             domain: ['auto', 'auto'],
             tickFormatter: (v: number) => `$${v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v}`,
           }),
-          React.createElement(YAxis, {
+          React.createElement(asChartComponent(YAxis), {
             yAxisId: 'right',
             orientation: 'right',
             stroke: axisStroke,
@@ -217,17 +221,17 @@ function buildSp500RatesChart(data: { date: string; sp500: number; fedFunds: num
             domain: ['auto', 'auto'],
             tickFormatter: (v: number) => `${v}%`,
           }),
-          React.createElement(Tooltip, {
+          React.createElement(asChartComponent(Tooltip), {
             contentStyle: tooltipStyle,
             labelFormatter: (label: string) => new Date(label).toLocaleDateString(),
             formatter: (value: number, name: string) =>
               name === 'sp500' ? [`$${value.toFixed(2)}`, 'SPY'] : [`${value.toFixed(2)}%`, 'Fed Funds'],
           }),
-          React.createElement(Legend, {
+          React.createElement(asChartComponent(Legend), {
             wrapperStyle: { fontSize: 11 },
             formatter: (name: string) => (name === 'sp500' ? 'S&P 500 (SPY)' : 'Fed Funds Rate'),
           }),
-          React.createElement(Line, {
+          React.createElement(asChartComponent(Line), {
             yAxisId: 'left',
             type: 'monotone',
             dataKey: 'sp500',
@@ -238,7 +242,7 @@ function buildSp500RatesChart(data: { date: string; sp500: number; fedFunds: num
             isAnimationActive: true,
             animationDuration: 600,
           }),
-          React.createElement(Line, {
+          React.createElement(asChartComponent(Line), {
             yAxisId: 'right',
             type: 'monotone',
             dataKey: 'fedFunds',
@@ -272,11 +276,11 @@ function buildTenYFedChart(data: { date: string; tenY: number; fedFunds: number 
       'div',
       { className: contentClass + ' h-56' },
       React.createElement(
-        ResponsiveContainer,
+        ResponsiveContainer as React.ComponentType<{ width?: string; height?: string; children?: React.ReactNode }>,
         { width: '100%', height: '100%' },
-        React.createElement(LineChart, { data, margin: { top: 8, right: 8, left: 0, bottom: 0 } },
-          React.createElement(CartesianGrid, { strokeDasharray: '3 3', stroke: gridStroke }),
-          React.createElement(XAxis, {
+        React.createElement(asChartComponent(LineChart), { data, margin: { top: 8, right: 8, left: 0, bottom: 0 } },
+          React.createElement(asChartComponent(CartesianGrid), { strokeDasharray: '3 3', stroke: gridStroke }),
+          React.createElement(asChartComponent(XAxis), {
             dataKey: 'date',
             stroke: axisStroke,
             tick: { fontSize: 10 },
@@ -285,20 +289,20 @@ function buildTenYFedChart(data: { date: string; tenY: number; fedFunds: number 
               return `${d.getMonth() + 1}/${String(d.getFullYear()).slice(2)}`;
             },
           }),
-          React.createElement(YAxis, {
+          React.createElement(asChartComponent(YAxis), {
             stroke: axisStroke,
             tick: { fontSize: 10 },
             domain: ['auto', 'auto'],
             tickFormatter: (v: number) => `${v}%`,
           }),
-          React.createElement(Tooltip, {
+          React.createElement(asChartComponent(Tooltip), {
             contentStyle: tooltipStyle,
             labelFormatter: (label: string) => new Date(label).toLocaleDateString(),
             formatter: (value: number, name: string) =>
               [`${value.toFixed(2)}%`, name === 'tenY' ? '10Y Treasury' : 'Fed Funds'],
           }),
-          React.createElement(Legend, { wrapperStyle: { fontSize: 11 } }),
-          React.createElement(Line, {
+          React.createElement(asChartComponent(Legend), { wrapperStyle: { fontSize: 11 } }),
+          React.createElement(asChartComponent(Line), {
             type: 'monotone',
             dataKey: 'tenY',
             name: '10Y Treasury',
@@ -308,7 +312,7 @@ function buildTenYFedChart(data: { date: string; tenY: number; fedFunds: number 
             isAnimationActive: true,
             animationDuration: 600,
           }),
-          React.createElement(Line, {
+          React.createElement(asChartComponent(Line), {
             type: 'monotone',
             dataKey: 'fedFunds',
             name: 'Fed Funds',
