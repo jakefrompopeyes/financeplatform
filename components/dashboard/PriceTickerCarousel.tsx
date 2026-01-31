@@ -69,24 +69,36 @@ export default function PriceTickerCarousel() {
     return () => clearInterval(interval);
   }, []);
 
+  // Fallback tickers so the carousel always appears when API fails or returns empty
+  const FALLBACK_TICKERS: TickerItem[] = [
+    { symbol: 'AAPL', name: 'Apple Inc.', price: 0, change: 0, changePercent: 0, type: 'stock' },
+    { symbol: 'MSFT', name: 'Microsoft', price: 0, change: 0, changePercent: 0, type: 'stock' },
+    { symbol: 'GOOGL', name: 'Alphabet', price: 0, change: 0, changePercent: 0, type: 'stock' },
+    { symbol: 'AMZN', name: 'Amazon', price: 0, change: 0, changePercent: 0, type: 'stock' },
+    { symbol: 'NVDA', name: 'NVIDIA', price: 0, change: 0, changePercent: 0, type: 'stock' },
+    { symbol: 'BTC', name: 'Bitcoin', price: 0, change: 0, changePercent: 0, type: 'crypto' },
+    { symbol: 'ETH', name: 'Ethereum', price: 0, change: 0, changePercent: 0, type: 'crypto' },
+  ];
+
   if (loading) {
     return (
       <div className="w-full h-16 bg-muted/30 rounded-lg animate-pulse"></div>
     );
   }
 
-  if (data.length === 0) {
-    return null;
-  }
-
-  // Get unique items for display (remove duplicates)
-  const uniqueData = data.slice(0, data.length / 2);
+  const displayData = data.length > 0 ? data : [...FALLBACK_TICKERS, ...FALLBACK_TICKERS];
+  const isFallback = data.length === 0;
 
   return (
     <div className="w-full overflow-hidden bg-muted/20 rounded-lg border border-border/50">
+      {isFallback && (
+        <div className="text-xs text-muted-foreground px-3 py-1 border-b border-border/50 bg-muted/30">
+          Live prices unavailable — configure FMP_API_KEY and refresh
+        </div>
+      )}
       <div className="relative h-16 flex items-center">
         <div className="flex animate-scroll whitespace-nowrap will-change-transform">
-          {data.map((item, index) => {
+          {displayData.map((item, index) => {
             const isPositive = item.changePercent >= 0;
             return (
               <button
