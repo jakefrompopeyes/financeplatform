@@ -13,6 +13,7 @@ interface MarketData {
   change: number;
   changesPercentage: number;
   historical: { date: string; close: number }[];
+  sparklineAvailable?: boolean;
 }
 
 export default function MarketOverview() {
@@ -82,11 +83,11 @@ export default function MarketOverview() {
                 <p className="text-sm mb-2 text-amber-600 dark:text-amber-400">{errorMessage}</p>
               )}
               {(!errorMessage || /api key/i.test(errorMessage)) ? (
-                <p className="text-sm">Add FMP_API_KEY to .env.local (get a free key at financialmodelingprep.com)</p>
+                <p className="text-sm">Add `FMP_API_KEY` to `.env.local`</p>
               ) : /restricted|subscription|upgrade/i.test(errorMessage) ? (
-                <p className="text-sm">Your FMP plan may not include this endpoint. Consider upgrading or switching endpoints.</p>
+                <p className="text-sm">FMP restricted this endpoint for your subscription.</p>
               ) : (
-                <p className="text-sm">Check your FMP key and try again.</p>
+                <p className="text-sm">Check your FMP configuration and try again.</p>
               )}
             </div>
           </CardContent>
@@ -101,14 +102,12 @@ export default function MarketOverview() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {data.map((item) => {
           const isPositive = item.changesPercentage >= 0;
-          const displayName = item.name.includes('S&P') ? 'S&P 500' : 
-                            item.name.includes('NASDAQ') ? 'NASDAQ' : 'Dow Jones';
           
           return (
             <Card key={item.symbol}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base font-normal text-secondary">
-                  {displayName}
+                  {item.name}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -125,22 +124,25 @@ export default function MarketOverview() {
                 </div>
                 
                 <div className="h-16">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={item.historical} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                      <YAxis 
-                        domain={['dataMin - 2', 'dataMax + 2']} 
-                        hide={true}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="close" 
-                        stroke={isPositive ? '#10b981' : '#ef4444'} 
-                        strokeWidth={2}
-                        dot={false}
-                        isAnimationActive={false}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
+                  {item.historical && item.historical.length >= 2 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={item.historical} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                        <YAxis domain={['dataMin - 2', 'dataMax + 2']} hide={true} />
+                        <Line
+                          type="monotone"
+                          dataKey="close"
+                          stroke={isPositive ? '#10b981' : '#ef4444'}
+                          strokeWidth={2}
+                          dot={false}
+                          isAnimationActive={false}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
+                      Sparkline unavailable
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

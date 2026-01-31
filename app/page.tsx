@@ -24,8 +24,11 @@ export default function Home() {
         <header className="mb-12">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 mb-6">
             <div>
-              <h1 className="text-4xl font-light text-foreground mb-2">
+              <h1 className="text-4xl font-light text-foreground mb-2 flex items-center gap-3">
                 Stonkscan
+                <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/40">
+                  Beta
+                </span>
               </h1>
               <p className="text-secondary">
                 Real-time financial market analytics and insights · stonkscan.com

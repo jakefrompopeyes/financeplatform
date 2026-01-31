@@ -98,30 +98,13 @@ export async function GET() {
       };
     }).filter((market: { probabilities: unknown[] }) => market.probabilities.length > 0); // Only include markets with valid probabilities
 
-    // If no rate-related markets found, return demo data
+    // If no rate-related markets found, return an empty list (no demo/mock data)
     if (formattedMarkets.length === 0) {
       return NextResponse.json({
-        markets: [
-          {
-            id: 'demo-fed-dec',
-            question: 'Fed decision in December?',
-            probabilities: [
-              { outcome: '25 bps decrease', probability: 52 },
-              { outcome: 'No change', probability: 47 },
-              { outcome: '50+ bps decrease', probability: 2.3 },
-              { outcome: '25+ bps increase', probability: 0.6 }
-            ],
-            volume: 113675185,
-            liquidity: 0,
-            endDate: new Date('2025-12-10').toISOString(),
-            active: true,
-            url: 'https://polymarket.com/event/fed-decision-in-december',
-            demo: true
-          }
-        ],
+        markets: [],
         lastUpdated: new Date().toISOString(),
         source: 'Polymarket',
-        note: 'No active December Fed decision market found on Polymarket. Showing demo data. Real markets typically become available closer to the FOMC meeting date.'
+        note: 'No rate-related markets found on Polymarket.'
       });
     }
 
@@ -133,31 +116,10 @@ export async function GET() {
 
   } catch (error) {
     console.error('Error fetching Polymarket data:', error);
-    
-    // Return sample data for demonstration if API fails
-    return NextResponse.json({
-      markets: [
-        {
-          id: 'error-fed-dec',
-          question: 'Fed decision in December?',
-          probabilities: [
-            { outcome: '25 bps decrease', probability: 52 },
-            { outcome: 'No change', probability: 47 },
-            { outcome: '50+ bps decrease', probability: 2.3 },
-            { outcome: '25+ bps increase', probability: 0.6 }
-          ],
-          volume: 0,
-          liquidity: 0,
-          endDate: new Date('2025-12-10').toISOString(),
-          active: true,
-          url: 'https://polymarket.com/event/fed-decision-in-december',
-          demo: true
-        }
-      ],
-      lastUpdated: new Date().toISOString(),
-      source: 'Polymarket',
-      note: 'Unable to connect to Polymarket API. Showing demo data for December Fed decision market.'
-    });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to fetch Polymarket markets' },
+      { status: 500 }
+    );
   }
 }
 

@@ -43,7 +43,7 @@ export default function PriceTickerCarousel() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch('/api/price-ticker');
+        const response = await fetch('/api/price-ticker', { cache: 'no-store' });
         const result = await response.json();
         
         if (result.error) {
@@ -69,33 +69,27 @@ export default function PriceTickerCarousel() {
     return () => clearInterval(interval);
   }, []);
 
-  // Fallback tickers so the carousel always appears when API fails or returns empty
-  const FALLBACK_TICKERS: TickerItem[] = [
-    { symbol: 'AAPL', name: 'Apple Inc.', price: 0, change: 0, changePercent: 0, type: 'stock' },
-    { symbol: 'MSFT', name: 'Microsoft', price: 0, change: 0, changePercent: 0, type: 'stock' },
-    { symbol: 'GOOGL', name: 'Alphabet', price: 0, change: 0, changePercent: 0, type: 'stock' },
-    { symbol: 'AMZN', name: 'Amazon', price: 0, change: 0, changePercent: 0, type: 'stock' },
-    { symbol: 'NVDA', name: 'NVIDIA', price: 0, change: 0, changePercent: 0, type: 'stock' },
-    { symbol: 'BTC', name: 'Bitcoin', price: 0, change: 0, changePercent: 0, type: 'crypto' },
-    { symbol: 'ETH', name: 'Ethereum', price: 0, change: 0, changePercent: 0, type: 'crypto' },
-  ];
-
   if (loading) {
     return (
       <div className="w-full h-16 bg-muted/30 rounded-lg animate-pulse"></div>
     );
   }
 
-  const displayData = data.length > 0 ? data : [...FALLBACK_TICKERS, ...FALLBACK_TICKERS];
-  const isFallback = data.length === 0;
+  if (data.length === 0) {
+    return (
+      <div className="w-full overflow-hidden bg-muted/20 rounded-lg border border-border/50 px-4 py-3">
+        <p className="text-sm text-muted-foreground">
+          Live prices could not be loaded. Ensure <code className="text-xs bg-muted px-1 rounded">FMP_API_KEY</code> and <code className="text-xs bg-muted px-1 rounded">COINGECKO_API_KEY</code> are set in <code className="text-xs bg-muted px-1 rounded">.env.local</code> and restart the dev server.
+        </p>
+      </div>
+    );
+  }
+
+  // Duplicate for seamless infinite scroll
+  const displayData = [...data, ...data];
 
   return (
     <div className="w-full overflow-hidden bg-muted/20 rounded-lg border border-border/50">
-      {isFallback && (
-        <div className="text-xs text-muted-foreground px-3 py-1 border-b border-border/50 bg-muted/30">
-          Live prices unavailable — configure FMP_API_KEY and refresh
-        </div>
-      )}
       <div className="relative h-16 flex items-center">
         <div className="flex animate-scroll whitespace-nowrap will-change-transform">
           {displayData.map((item, index) => {
@@ -108,14 +102,27 @@ export default function PriceTickerCarousel() {
                 className="flex items-center gap-4 px-6 border-r border-border/50 flex-shrink-0 cursor-pointer hover:bg-accent/50 transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-inset rounded-sm text-left"
               >
                 <div className="flex items-center gap-2 min-w-[120px]">
-                  {item.image && (
+                  {item.type === 'crypto' ? (
+                    item.image ? (
+                      <img 
+                        src={item.image} 
+                        alt="" 
+                        className="w-5 h-5 rounded object-contain flex-shrink-0 bg-muted/30"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    ) : (
+                      <div className="w-5 h-5 rounded bg-muted/30 flex-shrink-0 flex items-center justify-center text-[10px] font-medium text-muted-foreground">
+                        {item.symbol.slice(0, 2)}
+                      </div>
+                    )
+                  ) : item.image ? (
                     <img 
                       src={item.image} 
                       alt="" 
                       className="w-5 h-5 rounded object-contain flex-shrink-0 bg-muted/30"
                       onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                     />
-                  )}
+                  ) : null}
                   <div className="flex flex-col min-w-0">
                     <span className="text-sm font-medium text-foreground">
                       {item.symbol}

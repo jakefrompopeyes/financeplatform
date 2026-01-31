@@ -2,8 +2,12 @@ import { NextResponse } from 'next/server';
 
 const FMP_API_KEY = process.env.FMP_API_KEY;
 const COINGECKO_API_KEY = process.env.COINGECKO_API_KEY;
-const FMP_BASE_URL = 'https://financialmodelingprep.com/stable';
+const FMP_STABLE_URL = 'https://financialmodelingprep.com/stable';
+const FMP_V3_URL = 'https://financialmodelingprep.com/api/v3';
 const COINGECKO_BASE_URL = 'https://api.coingecko.com/api/v3';
+
+const POPULAR_STOCKS = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX'];
+const LOGO_BASE = 'https://financialmodelingprep.com/image-stock';
 
 interface TickerItem {
   symbol: string;
@@ -19,37 +23,103 @@ export async function GET() {
   try {
     const tickerItems: TickerItem[] = [];
 
-    // Fetch popular stocks via FMP batch quote
+    // Fetch popular stocks: try stable batch-quote first, then v3 quote (free tier)
     if (FMP_API_KEY && FMP_API_KEY !== 'your_api_key_here') {
-      const popularStocks = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX'];
-      const symbolsParam = popularStocks.join(',');
+      const symbolsParam = POPULAR_STOCKS.join(',');
 
-      const batchRes = await fetch(
-        `${FMP_BASE_URL}/batch-quote?symbols=${symbolsParam}&apikey=${FMP_API_KEY}`
-      );
-      const batchData = await batchRes.json();
+      // 1) Try stable batch-quote (paid starter+; returns array or wrapped)
+      try {
+        const batchRes = await fetch(
+          `${FMP_STABLE_URL}/batch-quote?symbols=${symbolsParam}&apikey=${FMP_API_KEY}`,
+          { cache: 'no-store' }
+        );
+        const text = await batchRes.text();
+        let raw: any;
+        try {
+          raw = text ? JSON.parse(text) : null;
+        } catch {
+          // fall through to v3
+        }
+        const batchData: any[] = Array.isArray(raw)
+          ? raw
+          : raw?.data ?? raw?.quotes ?? raw?.results ?? (Array.isArray(raw?.quote) ? raw.quote : []);
+        if (batchRes.ok && batchData.length > 0) {
+          const stockItems: TickerItem[] = batchData
+            .filter((q: any) => q?.symbol != null && (q?.price != null || q?.last != null))
+            .map((q: any) => {
+              const price = parseFloat(q.price ?? q.last ?? q.close ?? 0);
+              const prevClose = parseFloat(q.previousClose ?? q.dayBefore ?? q.price ?? q.last ?? price);
+              const change =
+                typeof q.change === 'number'
+                  ? q.change
+                  : typeof q.change === 'string'
+                    ? parseFloat(q.change) || 0
+                    : price - prevClose;
+              const changePercent =
+                typeof q.changesPercentage === 'number'
+                  ? q.changesPercentage
+                  : typeof q.changesPercentage === 'string'
+                    ? parseFloat(q.changesPercentage) || 0
+                    : prevClose !== 0
+                      ? (change / prevClose) * 100
+                      : 0;
+              const symbol = (q.symbol || '').toUpperCase();
+              return {
+                symbol,
+                name: q.name || q.symbol || q.shortName || '',
+                price,
+                change,
+                changePercent,
+                type: 'stock' as const,
+                image: `${LOGO_BASE}/${symbol}.png`
+              };
+            });
+          if (stockItems.length > 0) tickerItems.push(...stockItems);
+        }
+      } catch (err) {
+        console.error('FMP batch-quote error:', err);
+      }
 
-      const logoBase = 'https://financialmodelingprep.com/image-stock';
-      if (Array.isArray(batchData)) {
-        const stockItems: TickerItem[] = batchData
-          .filter((q: any) => q?.symbol && q?.price != null)
-          .map((q: any) => {
-            const price = parseFloat(q.price);
-            const prevClose = parseFloat(q.previousClose ?? q.price);
-            const change = price - prevClose;
-            const changePercent = prevClose !== 0 ? (change / prevClose) * 100 : 0;
-            const symbol = (q.symbol || '').toUpperCase();
-            return {
-              symbol,
-              name: q.name || q.symbol || '',
-              price,
-              change,
-              changePercent,
-              type: 'stock' as const,
-              image: `${logoBase}/${symbol}.png`
-            };
-          });
-        tickerItems.push(...stockItems);
+      // 2) If no stocks yet, use v3 quote (free tier; supports multiple symbols in path)
+      if (tickerItems.length === 0) {
+        try {
+          const v3Res = await fetch(
+            `${FMP_V3_URL}/quote/${symbolsParam}?apikey=${FMP_API_KEY}`,
+            { cache: 'no-store' }
+          );
+          const v3Text = await v3Res.text();
+          let v3Data: any;
+          try {
+            v3Data = v3Text ? JSON.parse(v3Text) : null;
+          } catch {
+            // skip
+          }
+          if (v3Res.ok && Array.isArray(v3Data) && v3Data.length > 0) {
+            const stockItems: TickerItem[] = v3Data
+              .filter((q: any) => q?.symbol && q?.price != null)
+              .map((q: any) => {
+                const price = parseFloat(q.price);
+                const change = typeof q.change === 'number' ? q.change : parseFloat(q.change) ?? 0;
+                const changePercent =
+                  typeof q.changesPercentage === 'number'
+                    ? q.changesPercentage
+                    : parseFloat(q.changesPercentage) ?? (q.change != null && q.price ? (change / price) * 100 : 0);
+                const symbol = (q.symbol || '').toUpperCase();
+                return {
+                  symbol,
+                  name: q.name || q.symbol || '',
+                  price,
+                  change,
+                  changePercent,
+                  type: 'stock' as const,
+                  image: `${LOGO_BASE}/${symbol}.png`
+                };
+              });
+            if (stockItems.length > 0) tickerItems.push(...stockItems);
+          }
+        } catch (err) {
+          console.error('FMP v3 quote error:', err);
+        }
       }
     }
 
@@ -61,6 +131,7 @@ export async function GET() {
       const marketsResponse = await fetch(
         `${COINGECKO_BASE_URL}/coins/markets?vs_currency=usd&ids=${cryptoIds.join(',')}&order=market_cap_desc&sparkline=false&price_change_percentage=24h${apiKeyParam}`,
         {
+          cache: 'no-store',
           headers: {
             Accept: 'application/json'
           }
@@ -69,6 +140,7 @@ export async function GET() {
 
       if (marketsResponse.ok) {
         const marketsData = await marketsResponse.json();
+        const normImg = (c: any) => typeof c?.image === 'string' ? c.image : (c?.image?.small || c?.image?.large || '');
 
         const cryptoItems: TickerItem[] = marketsData.map((coin: any) => ({
           symbol: coin.symbol.toUpperCase(),
@@ -77,7 +149,7 @@ export async function GET() {
           change: coin.price_change_24h || 0,
           changePercent: coin.price_change_percentage_24h || 0,
           type: 'crypto' as const,
-          image: coin.image
+          image: normImg(coin) || undefined
         }));
 
         tickerItems.push(...cryptoItems);

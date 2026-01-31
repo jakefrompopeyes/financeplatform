@@ -1,15 +1,41 @@
 import { NextResponse } from 'next/server';
 
 const FMP_API_KEY = process.env.FMP_API_KEY;
-const TWELVE_DATA_API_KEY = process.env.TWELVE_DATA_API_KEY;
 const BASE_URL = 'https://financialmodelingprep.com/stable';
-const TWELVE_BASE_URL = 'https://api.twelvedata.com';
 
-type FetchJsonResult =
+type MarketPoint = { date: string; close: number };
+
+type MarketItem = {
+  symbol: string;
+  name: string;
+  price: number;
+  change: number;
+  changesPercentage: number;
+  historical: MarketPoint[];
+  sparklineAvailable: boolean;
+};
+
+type FetchResult =
   | { ok: true; status: number; data: any }
   | { ok: false; status: number; error: string };
 
-async function fetchJson(url: string, revalidateSeconds = 60): Promise<FetchJsonResult> {
+function toNumber(value: any): number | null {
+  if (value == null || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function getErrorMessageFromBody(body: any): string | null {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
+  return (
+    body['Error Message'] ??
+    body.message ??
+    body.error ??
+    null
+  );
+}
+
+async function fetchFmpJson(url: string, revalidateSeconds = 60): Promise<FetchResult> {
   const res = await fetch(url, { next: { revalidate: revalidateSeconds } });
   const text = await res.text();
 
@@ -18,50 +44,24 @@ async function fetchJson(url: string, revalidateSeconds = 60): Promise<FetchJson
     data = text ? JSON.parse(text) : null;
   } catch {
     // FMP sometimes returns plain text like "Restricted Endpoint..." (non-JSON)
-    const msg = text?.trim() || `HTTP ${res.status}`;
-    return { ok: false, status: res.status, error: msg };
+    return { ok: false, status: res.status, error: text?.trim() || `HTTP ${res.status}` };
   }
 
   if (!res.ok) {
-    const msgRaw =
-      data && typeof data === 'object' && !Array.isArray(data)
-        ? (data as any)['Error Message'] ?? (data as any).message ?? (data as any).error
-        : null;
-    const msg = (typeof msgRaw === 'string' ? msgRaw : null) ?? text?.trim() ?? `HTTP ${res.status}`;
+    const msg = getErrorMessageFromBody(data) ?? text?.trim() ?? `HTTP ${res.status}`;
     return { ok: false, status: res.status, error: msg };
   }
 
   return { ok: true, status: res.status, data };
 }
 
-function isRestrictedMessage(msg: string): boolean {
-  return /restricted|subscription|upgrade/i.test(msg);
-}
-
-function asNumber(value: any): number | null {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
-}
-
-function normalizeQuoteLike(raw: any): { symbol: string; price: number; change: number; changesPercentage: number } | null {
-  if (!raw || typeof raw !== 'object') return null;
-  const symbol = String(raw.symbol || '').toUpperCase();
-  const price = asNumber(raw.price);
-  if (!symbol || price == null) return null;
-
-  const change =
-    asNumber(raw.change) ??
-    asNumber(raw.changes) ??
-    (asNumber(raw.previousClose) != null ? price - asNumber(raw.previousClose)! : 0);
-
-  const changesPercentage =
-    asNumber(raw.changesPercentage) ??
-    asNumber(raw.changePercent) ??
-    asNumber(raw.changePercentage) ??
-    (price - change !== 0 ? (change / (price - change)) * 100 : 0);
-
-  return { symbol, price, change, changesPercentage };
-}
+// Use the actual index symbols (not ETF proxies like QQQ/DIA).
+// This makes the displayed levels + % change match the real indices.
+const INDICES = [
+  { symbol: '^GSPC', displayName: 'S&P 500' },
+  { symbol: '^IXIC', displayName: 'NASDAQ' },
+  { symbol: '^DJI', displayName: 'Dow Jones' }
+] as const;
 
 export async function GET() {
   try {
@@ -72,151 +72,81 @@ export async function GET() {
       );
     }
 
-    // ETFs that track major indices (use stable API)
-    const indices = [
-      { symbol: 'SPY', name: 'SPDR S&P 500 ETF', displayName: 'S&P 500 (SPY)' },
-      { symbol: 'QQQ', name: 'Invesco QQQ ETF', displayName: 'NASDAQ (QQQ)' },
-      { symbol: 'DIA', name: 'SPDR Dow Jones ETF', displayName: 'Dow Jones (DIA)' }
-    ];
-
-    const symbolsParam = indices.map((i) => i.symbol).join(',');
-    // Prefer short quote endpoints (often less restricted than full quote/batch-quote).
-    // 1) Try batch-quote-short
-    // 2) If restricted, fall back to quote-short per symbol
-    // 3) If FMP is entirely restricted, fall back to Twelve Data if configured
-    let quotes: { symbol: string; price: number; change: number; changesPercentage: number }[] | null = null;
-    let lastError: string | null = null;
-
-    const batchShort = await fetchJson(
-      `${BASE_URL}/batch-quote-short?symbols=${symbolsParam}&apikey=${FMP_API_KEY}`,
-      60
+    // Quotes (required). Use full `quote` so we reliably have previousClose for accurate %.
+    const quoteResponses = await Promise.all(
+      INDICES.map((idx) =>
+        fetchFmpJson(
+          `${BASE_URL}/quote?symbol=${encodeURIComponent(idx.symbol)}&apikey=${FMP_API_KEY}`,
+          60
+        )
+      )
     );
-    if (batchShort.ok) {
-      const data = batchShort.data;
-      if (Array.isArray(data)) {
-        quotes = data
-          .map((x: any) => normalizeQuoteLike(x))
-          .filter((x): x is NonNullable<typeof x> => x != null);
-      } else {
-        const msg =
-          (data && typeof data === 'object' && !Array.isArray(data)
-            ? (data as any)['Error Message'] ?? (data as any).message ?? (data as any).error
-            : null) ?? 'Unexpected response';
-        lastError = String(msg);
-      }
-    } else {
-      lastError = batchShort.error;
+
+    for (const r of quoteResponses) {
+      if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status === 403 ? 403 : 500 });
     }
 
-    if (!quotes || quotes.length === 0) {
-      if (lastError && isRestrictedMessage(lastError)) {
-        const perSymbol = await Promise.all(
-          indices.map((index) =>
-            fetchJson(`${BASE_URL}/quote-short?symbol=${index.symbol}&apikey=${FMP_API_KEY}`, 60)
-          )
-        );
-        quotes = perSymbol
-          .map((r) => {
-            if (!r.ok) {
-              lastError = r.error;
-              return null;
-            }
-            const d = r.data;
-            const item = Array.isArray(d) ? d[0] : d;
-            return normalizeQuoteLike(item);
-          })
-          .filter((q): q is NonNullable<typeof q> => q != null);
-      }
-    }
+    const quotes = quoteResponses.map((r) => {
+      const payload = (r as any).data;
+      return Array.isArray(payload) ? payload[0] : payload;
+    });
 
-    if ((!quotes || quotes.length === 0) && TWELVE_DATA_API_KEY && TWELVE_DATA_API_KEY !== 'your_twelve_data_key_here') {
-      const perSymbol = await Promise.all(
-        indices.map(async (index) => {
-          const url = `${TWELVE_BASE_URL}/quote?symbol=${encodeURIComponent(index.symbol)}&apikey=${encodeURIComponent(TWELVE_DATA_API_KEY)}`;
-          const res = await fetch(url, { next: { revalidate: 60 } });
-          const data = await res.json().catch(() => null);
-          // Twelve Data returns { code, message } on error
-          if (!res.ok || (data && typeof data === 'object' && (data as any).code)) {
-            lastError = (data as any)?.message ?? `Twelve Data error: HTTP ${res.status}`;
-            return null;
-          }
-          const symbol = String(data.symbol || index.symbol).toUpperCase();
-          const price = asNumber(data.close ?? data.price) ?? asNumber(data.open) ?? null;
-          const change = asNumber(data.change) ?? 0;
-          const changesPercentage = asNumber(data.percent_change) ?? asNumber(data.change_percent) ?? 0;
-          if (!symbol || price == null) return null;
-          return { symbol, price, change, changesPercentage };
-        })
-      );
-      quotes = perSymbol.filter((q): q is NonNullable<typeof q> => q != null);
-    }
-
-    if (!quotes || quotes.length === 0) {
-      const msg = lastError || 'Unable to fetch market quotes.';
-      return NextResponse.json(
-        {
-          error: msg + (isRestrictedMessage(msg)
-            ? ' If you do not want to upgrade FMP, set TWELVE_DATA_API_KEY to use Twelve Data for market overview.'
-            : '')
-        },
-        { status: 500 }
-      );
-    }
-
-    // Historical sparkline data is "nice to have". If an endpoint is restricted, still show quotes.
-    const historicalLists = await Promise.all(
-      indices.map(async (index) => {
-        const hist = await fetchJson(
-          `${BASE_URL}/historical-price-eod/full?symbol=${index.symbol}&apikey=${FMP_API_KEY}`,
+    // Historical (optional). Still real data; if restricted we return empty sparklines but keep quotes.
+    const histResponses = await Promise.all(
+      INDICES.map((idx) =>
+        fetchFmpJson(
+          `${BASE_URL}/historical-price-eod/full?symbol=${encodeURIComponent(idx.symbol)}&apikey=${FMP_API_KEY}`,
           3600
-        );
-        if (!hist.ok) return [];
-        const raw = hist.data;
-        const list = Array.isArray(raw) ? raw : raw?.historical || [];
-        return Array.isArray(list) ? list : [];
-      })
+        )
+      )
     );
 
-    const validResults = indices
-      .map((index, i) => {
-        const quote = quotes!.find((q) => q.symbol === index.symbol);
-        if (!quote) return null;
-        const currentPrice = quote.price;
-        const change = quote.change;
-        const changesPercentage = quote.changesPercentage;
+    const out: MarketItem[] = INDICES.map((idx, i) => {
+      const q = quotes[i] ?? {};
+      const symbol = idx.symbol;
+      const price = toNumber(q.price) ?? 0;
+      const previousClose = toNumber(q.previousClose);
+      const change =
+        previousClose != null ? price - previousClose : (toNumber(q.change ?? q.changes) ?? 0);
+      const changesPercentage =
+        previousClose != null && previousClose !== 0
+          ? (change / previousClose) * 100
+          : (toNumber(q.changesPercentage ?? q.changePercent ?? q.changePercentage) ?? 0);
 
-        let historical: { date: string; close: number }[] = [];
-        const histList = historicalLists[i] || [];
-        if (histList.length > 0) {
-          historical = histList
+      const histRes = histResponses[i];
+      let sparklineAvailable = false;
+      let historical: MarketPoint[] = [];
+
+      if (histRes.ok) {
+        const raw = histRes.data;
+        const list = Array.isArray(raw) ? raw : raw?.historical || [];
+        if (Array.isArray(list) && list.length > 0) {
+          sparklineAvailable = true;
+          historical = list
             .slice(0, 30)
             .map((item: any) => ({
               date: (item.date || item.datetime || '').toString().slice(0, 10),
-              close: parseFloat(item.close ?? item.adjClose ?? item.price ?? 0)
+              close: Number.parseFloat(item.close ?? item.adjClose ?? item.price ?? 0),
             }))
-            .filter((x: { date: string }) => x.date)
-            .sort((a: { date: string }, b: { date: string }) => a.date.localeCompare(b.date));
+            .filter((p: MarketPoint) => p.date && Number.isFinite(p.close))
+            .sort((a: MarketPoint, b: MarketPoint) => a.date.localeCompare(b.date));
         }
+      }
 
-        return {
-          symbol: index.symbol,
-          name: index.displayName,
-          price: currentPrice,
-          change,
-          changesPercentage,
-          historical
-        };
-      })
-      .filter((r): r is NonNullable<typeof r> => r !== null);
+      return {
+        symbol,
+        name: idx.displayName,
+        price,
+        change,
+        changesPercentage,
+        historical,
+        sparklineAvailable
+      };
+    });
 
-    if (validResults.length === 0) {
-      return NextResponse.json(
-        { error: 'Unable to match quote data. Please check your FMP API key and try again.' },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json(validResults);
+    return NextResponse.json(out, {
+      headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120' }
+    });
   } catch (error) {
     console.error('Error fetching market overview:', error);
     return NextResponse.json(

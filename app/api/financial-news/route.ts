@@ -12,61 +12,11 @@ interface NewsArticle {
   category?: string;
 }
 
-// Fallback demo news for when API is not configured or has issues
-const DEMO_NEWS: NewsArticle[] = [
-  {
-    title: "S&P 500 Reaches New Heights Amid Tech Rally",
-    description: "Major technology stocks led the market higher today as investors showed renewed confidence in growth stocks.",
-    url: "https://www.marketwatch.com",
-    urlToImage: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400",
-    publishedAt: new Date().toISOString(),
-    source: { name: "MarketWatch" },
-    category: "markets"
-  },
-  {
-    title: "Federal Reserve Signals Continued Monetary Policy Support",
-    description: "Fed officials indicated they will maintain current interest rate levels to support economic recovery.",
-    url: "https://www.cnbc.com",
-    urlToImage: "https://images.unsplash.com/photo-1633158829875-e5316a358c6f?w=400",
-    publishedAt: new Date(Date.now() - 3600000).toISOString(),
-    source: { name: "CNBC" },
-    category: "economy"
-  },
-  {
-    title: "Tesla Announces Expansion Plans for New Manufacturing Facility",
-    description: "Electric vehicle maker Tesla revealed plans to build a new manufacturing plant, expanding production capacity.",
-    url: "https://www.reuters.com",
-    urlToImage: "https://images.unsplash.com/photo-1560958089-b8a1929cea89?w=400",
-    publishedAt: new Date(Date.now() - 7200000).toISOString(),
-    source: { name: "Reuters" },
-    category: "technology"
-  },
-  {
-    title: "Oil Prices Surge on Supply Concerns",
-    description: "Crude oil prices jumped as geopolitical tensions raised concerns about potential supply disruptions.",
-    url: "https://www.bloomberg.com",
-    urlToImage: "https://images.unsplash.com/photo-1564419434461-9c2069c93440?w=400",
-    publishedAt: new Date(Date.now() - 10800000).toISOString(),
-    source: { name: "Bloomberg" },
-    category: "commodities"
-  },
-  {
-    title: "Major Banks Report Strong Quarterly Earnings",
-    description: "Leading financial institutions exceeded analyst expectations with robust quarterly results driven by trading revenues.",
-    url: "https://www.wsj.com",
-    urlToImage: "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=400",
-    publishedAt: new Date(Date.now() - 14400000).toISOString(),
-    source: { name: "Wall Street Journal" },
-    category: "earnings"
-  }
-];
-
 async function fetchNewsAPI() {
   const apiKey = process.env.NEWS_API_KEY;
   
   if (!apiKey) {
-    console.log('NEWS_API_KEY not configured, using demo data');
-    return DEMO_NEWS;
+    throw new Error('NEWS_API_KEY not configured');
   }
 
   try {
@@ -76,34 +26,33 @@ async function fetchNewsAPI() {
     );
 
     if (!response.ok) {
-      console.error('NewsAPI error:', response.status);
-      return DEMO_NEWS;
+      const text = await response.text().catch(() => '');
+      throw new Error(`NewsAPI error: HTTP ${response.status} ${text}`.trim());
     }
 
     const data = await response.json();
     
     if (data.status !== 'ok' || !data.articles) {
-      console.error('NewsAPI returned error:', data);
-      return DEMO_NEWS;
+      throw new Error('NewsAPI returned an unexpected response');
     }
 
     return data.articles.map((article: any) => ({
       title: article.title,
       description: article.description || article.content?.substring(0, 200) + '...',
       url: article.url,
-      urlToImage: article.urlToImage || 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400',
+      urlToImage: article.urlToImage || '',
       publishedAt: article.publishedAt,
       source: { name: article.source.name },
       category: 'business'
     }));
   } catch (error) {
     console.error('Error fetching from NewsAPI:', error);
-    return DEMO_NEWS;
+    throw error;
   }
 }
 
 async function fetchAlphaVantageNews(symbol?: string) {
-  const apiKey = process.env.ALPHA_VANTAGE_API_KEY || process.env.FMP_API_KEY;
+  const apiKey = process.env.ALPHA_VANTAGE_API_KEY;
   
   if (!apiKey) {
     return [];
@@ -131,7 +80,7 @@ async function fetchAlphaVantageNews(symbol?: string) {
       title: article.title,
       description: article.summary?.substring(0, 200) + '...',
       url: article.url,
-      urlToImage: article.banner_image || 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400',
+      urlToImage: article.banner_image || '',
       publishedAt: article.time_published,
       source: { name: article.source },
       category: article.category_within_source
@@ -203,12 +152,10 @@ export async function GET(request: Request) {
 
   } catch (error) {
     console.error('Error in news API:', error);
-    return NextResponse.json({
-      articles: symbol ? [] : DEMO_NEWS.slice(0, limit),
-      totalResults: symbol ? 0 : DEMO_NEWS.length,
-      lastUpdated: new Date().toISOString(),
-      note: symbol ? `No news found for ${symbol}` : 'Using demo data'
-    });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to fetch news' },
+      { status: 500 }
+    );
   }
 }
 

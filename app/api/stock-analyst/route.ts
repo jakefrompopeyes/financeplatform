@@ -63,38 +63,11 @@ export async function GET(request: Request) {
       priceTargetSummary = firstItem(data);
     }
 
-    // Price Target Consensus - high, low, median, consensus (stable API; fallback: derive from v4 price-target list)
+    // Price Target Consensus - high, low, median, consensus (stable API)
     let priceTargetConsensus: any = null;
     if (priceTargetConsensusRes.ok) {
       const data = await priceTargetConsensusRes.json();
       priceTargetConsensus = firstItem(data);
-    }
-    const hasConsensusValues = priceTargetConsensus && (
-      priceTargetConsensus.high != null || priceTargetConsensus.low != null ||
-      priceTargetConsensus.consensus != null || priceTargetConsensus.mean != null ||
-      priceTargetConsensus.consensus_price_target != null
-    );
-    if (!hasConsensusValues) {
-      try {
-        const v4Res = await fetch(`${BASE_V4}/price-target?symbol=${symbol}&apikey=${FMP_API_KEY}`);
-        if (v4Res.ok) {
-          const v4Data = await v4Res.json();
-          const list = Array.isArray(v4Data) ? v4Data : v4Data?.data ?? [];
-          const prices = (list as any[])
-            .map((t: any) => t.priceWhenPosted ?? t.adjPriceWhenPosted ?? t.price ?? t.target)
-            .filter((n: any) => typeof n === 'number' && !Number.isNaN(n));
-          if (prices.length > 0) {
-            priceTargetConsensus = {
-              high: Math.max(...prices),
-              low: Math.min(...prices),
-              median: null,
-              consensus: prices.reduce((a, b) => a + b, 0) / prices.length,
-            };
-          }
-        }
-      } catch {
-        // ignore v4 fallback errors
-      }
     }
 
     // Grades Consensus - strong buy, buy, hold, sell, strong sell counts

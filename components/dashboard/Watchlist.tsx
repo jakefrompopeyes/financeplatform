@@ -117,11 +117,14 @@ export default function Watchlist({ onSelectAsset, recentlyViewed = [] }: Watchl
                 const price = crypto.currentPrice ?? crypto.current_price;
                 const change = crypto.priceChange24h ?? crypto.price_change_24h;
                 const pct = crypto.priceChangePercentage24h ?? crypto.price_change_percentage_24h;
+                const img = crypto.image;
+                const imageUrl = typeof img === 'string' ? img : (img?.small || img?.large || '');
                 return {
                   ...asset,
                   price: price != null ? Number(price) : undefined,
                   change: change != null ? Number(change) : undefined,
                   changePercent: pct != null && Number.isFinite(Number(pct)) ? Number(pct) : undefined,
+                  image: imageUrl || undefined,
                 };
               }
             }
@@ -372,13 +375,19 @@ export default function Watchlist({ onSelectAsset, recentlyViewed = [] }: Watchl
                             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                           />
                         )}
-                        {asset.type === 'crypto' && asset.image && (
-                          <img
-                            src={asset.image}
-                            alt=""
-                            className="w-8 h-8 rounded object-contain bg-muted/50 flex-shrink-0"
-                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                          />
+                        {asset.type === 'crypto' && (
+                          asset.image ? (
+                            <img
+                              src={asset.image}
+                              alt=""
+                              className="w-8 h-8 rounded object-contain bg-muted/50 flex-shrink-0"
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded bg-muted/50 flex-shrink-0 flex items-center justify-center text-xs font-medium text-muted-foreground">
+                              {asset.symbol.slice(0, 2)}
+                            </div>
+                          )
                         )}
                         <div>
                           <p className="font-semibold text-sm">{asset.symbol}</p>

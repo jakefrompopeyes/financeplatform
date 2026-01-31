@@ -24,7 +24,27 @@ export async function GET() {
       { next: { revalidate: 60 } }
     );
 
-    const data = await response.json();
+    const text = await response.text();
+    let data: any;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      return NextResponse.json(
+        { error: text?.trim() || 'Failed to parse response from FMP' },
+        { status: response.status === 403 ? 403 : 500 }
+      );
+    }
+
+    if (!response.ok) {
+      const msg =
+        data && typeof data === 'object' && !Array.isArray(data)
+          ? data['Error Message'] ?? data.message ?? data.error
+          : null;
+      return NextResponse.json(
+        { error: typeof msg === 'string' ? msg : text?.trim() || `FMP error: HTTP ${response.status}` },
+        { status: response.status === 403 ? 403 : 500 }
+      );
+    }
     if (!Array.isArray(data)) {
       return NextResponse.json(
         { error: 'Failed to fetch top movers data' },

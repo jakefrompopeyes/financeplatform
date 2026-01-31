@@ -4,6 +4,15 @@ const FMP_API_KEY = process.env.FMP_API_KEY;
 const BASE_URL = 'https://financialmodelingprep.com/stable';
 const GAMMA_API_BASE = 'https://gamma-api.polymarket.com';
 
+async function safeJson(res: Response): Promise<{ ok: true; data: any } | { ok: false; error: string }> {
+  const text = await res.text();
+  try {
+    return { ok: true, data: text ? JSON.parse(text) : null };
+  } catch {
+    return { ok: false, error: text?.trim() || `Failed to parse JSON (HTTP ${res.status})` };
+  }
+}
+
 async function fetchPolymarketSentiment() {
   try {
     const response = await fetch(
@@ -14,7 +23,9 @@ async function fetchPolymarketSentiment() {
       }
     );
     if (!response.ok) return null;
-    const marketsData = await response.json();
+    const parsed = await safeJson(response);
+    if (!parsed.ok) return null;
+    const marketsData = parsed.data;
     const markets = Array.isArray(marketsData) ? marketsData : marketsData.data || [];
     const sentimentMarkets = markets.filter((market: any) => {
       const question = market.question?.toLowerCase() || '';
@@ -64,24 +75,12 @@ async function fetchPolymarketSentiment() {
 }
 
 export async function GET() {
-  let polymarketMarkets: any[] = [];
-  try {
-    polymarketMarkets = (await fetchPolymarketSentiment()) || [];
-  } catch (e) {
-    polymarketMarkets = [];
-  }
-
   try {
     if (!FMP_API_KEY || FMP_API_KEY === 'your_api_key_here') {
-      return NextResponse.json({
-        vix: null,
-        putCall: null,
-        polymarketMarkets,
-        lastUpdated: new Date().toISOString(),
-        note: polymarketMarkets.length > 0
-          ? 'FMP API key not configured. Showing Polymarket prediction markets only.'
-          : 'FMP API key not configured and no Polymarket markets found.'
-      });
+      return NextResponse.json(
+        { error: 'FMP API key not configured' },
+        { status: 500 }
+      );
     }
 
     // FMP: VIX is often ^VIX; try both
@@ -90,8 +89,16 @@ export async function GET() {
       fetch(`${BASE_URL}/quote?symbol=${encodeURIComponent(vixSymbol)}&apikey=${FMP_API_KEY}`),
       fetch(`${BASE_URL}/historical-price-eod/full?symbol=${encodeURIComponent(vixSymbol)}&apikey=${FMP_API_KEY}`)
     ]);
-    const vixQuoteData = await vixQuoteRes.json();
-    const vixHistoricalData = await vixHistRes.json();
+    const vixQuoteParsed = await safeJson(vixQuoteRes);
+    const vixHistParsed = await safeJson(vixHistRes);
+    if (!vixQuoteParsed.ok || !vixHistParsed.ok) {
+      return NextResponse.json(
+        { error: 'Unable to fetch VIX data from FMP.' },
+        { status: 500 }
+      );
+    }
+    const vixQuoteData = vixQuoteParsed.data;
+    const vixHistoricalData = vixHistParsed.data;
 
     let vixData: any = null;
     const vixQuote = Array.isArray(vixQuoteData) ? vixQuoteData[0] : vixQuoteData;
@@ -113,58 +120,18 @@ export async function GET() {
       };
     }
 
-    // Put/Call: FMP may not have CBOE put/call; use demo data
-    const baseRatio = 0.85 + Math.random() * 0.3;
-    const putCallData = {
-      current: parseFloat(baseRatio.toFixed(3)),
-      change: parseFloat((Math.random() * 0.1 - 0.05).toFixed(3)),
-      changePercent: parseFloat((Math.random() * 10 - 5).toFixed(2)),
-      previousClose: parseFloat((baseRatio - (Math.random() * 0.1 - 0.05)).toFixed(3)),
-      historical: Array.from({ length: 30 }, (_, i) => {
-        const d = new Date();
-        d.setDate(d.getDate() - (29 - i));
-        return { date: d.toISOString().split('T')[0], value: parseFloat((0.85 + Math.random() * 0.3).toFixed(3)) };
-      }),
-      demo: true
-    };
-
+    const polymarketMarkets = (await fetchPolymarketSentiment()) || [];
     return NextResponse.json({
       vix: vixData,
-      putCall: putCallData,
+      putCall: null,
       polymarketMarkets,
       lastUpdated: new Date().toISOString()
     });
   } catch (error) {
     console.error('Error fetching market sentiment data:', error);
-    const baseVix = 15.5;
-    return NextResponse.json({
-      vix: {
-        current: baseVix,
-        change: 0.5,
-        changePercent: 3.33,
-        previousClose: 15.0,
-        historical: Array.from({ length: 30 }, (_, i) => {
-          const d = new Date();
-          d.setDate(d.getDate() - (29 - i));
-          return { date: d.toISOString().split('T')[0], value: parseFloat((12 + Math.random() * 8).toFixed(2)) };
-        }),
-        demo: true
-      },
-      putCall: {
-        current: 0.95,
-        change: 0.05,
-        changePercent: 5.56,
-        previousClose: 0.90,
-        historical: Array.from({ length: 30 }, (_, i) => {
-          const d = new Date();
-          d.setDate(d.getDate() - (29 - i));
-          return { date: d.toISOString().split('T')[0], value: parseFloat((0.85 + Math.random() * 0.3).toFixed(3)) };
-        }),
-        demo: true
-      },
-      polymarketMarkets,
-      lastUpdated: new Date().toISOString(),
-      note: 'Using demo VIX and Put/Call data - FMP API unavailable or VIX symbol not supported'
-    });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to fetch market sentiment data' },
+      { status: 500 }
+    );
   }
 }

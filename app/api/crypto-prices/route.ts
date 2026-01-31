@@ -3,10 +3,15 @@ import { NextResponse } from 'next/server';
 const COINGECKO_API_KEY = process.env.COINGECKO_API_KEY;
 const BASE_URL = 'https://api.coingecko.com/api/v3';
 
+function normalizeImage(coin: { image?: string | { small?: string; large?: string } }): string {
+  const img = coin.image;
+  return typeof img === 'string' ? img : (img?.small || img?.large || '');
+}
+
 export async function GET() {
   try {
-    // Top 3 cryptocurrencies to display
-    const cryptoIds = ['bitcoin', 'ethereum', 'solana'];
+    // Popular cryptocurrencies (aligned with price-ticker so watchlist/ticker get icons)
+    const cryptoIds = ['bitcoin', 'ethereum', 'solana', 'binancecoin', 'cardano', 'dogecoin', 'ripple', 'polkadot'];
     
     // Build API URL with or without API key
     const apiKeyParam = COINGECKO_API_KEY ? `&x_cg_demo_api_key=${COINGECKO_API_KEY}` : '';
@@ -69,7 +74,7 @@ export async function GET() {
             id: coin.id,
             symbol: coin.symbol.toUpperCase(),
             name: coin.name,
-            image: coin.image,
+            image: normalizeImage(coin),
             currentPrice: coin.current_price,
             priceChange24h: coin.price_change_24h || 0,
             priceChangePercentage24h: coin.price_change_percentage_24h || 0,
@@ -87,7 +92,7 @@ export async function GET() {
             id: coin.id,
             symbol: coin.symbol.toUpperCase(),
             name: coin.name,
-            image: coin.image,
+            image: normalizeImage(coin),
             currentPrice: coin.current_price,
             priceChange24h: coin.price_change_24h || 0,
             priceChangePercentage24h: coin.price_change_percentage_24h || 0,
