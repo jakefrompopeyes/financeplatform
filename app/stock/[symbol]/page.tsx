@@ -4,12 +4,11 @@ import { useEffect, useState, useCallback, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, TrendingDown, Activity, DollarSign, BarChart3, Calendar, Sparkles, ArrowLeft, Star, Share2, Megaphone, Target, MessageSquare, FileText, Award, UserCheck, ExternalLink, ChevronDown, ChevronRight } from 'lucide-react';
+import { TrendingUp, TrendingDown, Activity, DollarSign, BarChart3, Sparkles, ArrowLeft, Star, Share2, UserCheck, ExternalLink, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import StockAI from '@/components/dashboard/StockAI';
 import RelatedStocks from '@/components/dashboard/RelatedStocks';
 import IncomeWaterfall from '@/components/dashboard/IncomeWaterfall';
-import FutureEarnings from '@/components/dashboard/FutureEarnings';
 import CashFlowWaterfall from '@/components/dashboard/CashFlowWaterfall';
 import MarginTrends from '@/components/dashboard/MarginTrends';
 import RevenueEarningsChart from '@/components/dashboard/RevenueEarningsChart';
@@ -20,7 +19,7 @@ import Link from 'next/link';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import TradingViewWidget from '@/components/TradingViewWidget';
 import { toast } from 'sonner';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, ComposedChart, BarChart, Bar, Line, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis } from 'recharts';
 
 interface StockDetails {
   symbol: string;
@@ -166,33 +165,6 @@ function groupInsiderTradesByWeek(trades: InsiderTrade[]): InsiderTradeGroup[] {
   return groups;
 }
 
-interface AnalystData {
-  symbol: string;
-  priceTargetSummary: {
-    lastMonthAvg: number | null;
-    lastQuarterAvg: number | null;
-    lastYearAvg: number | null;
-    allTimeAvg: number | null;
-    analystCount: number | null;
-  } | null;
-  priceTargetConsensus: {
-    high: number | null;
-    low: number | null;
-    median: number | null;
-    consensus: number | null;
-  } | null;
-  gradesConsensus: {
-    strongBuy: number;
-    buy: number;
-    hold: number;
-    sell: number;
-    strongSell: number;
-  } | null;
-  grades: { date: string | null; analyst: string | null; action: string | null; from: string | null; to: string | null; company: string | null }[];
-  analystEstimates: { date: string | null; revenueEst: number | null; epsEst: number | null; period: string | null }[];
-  quarterlyEstimates?: { date: string | null; revenueEst: number | null; epsEst: number | null; period: string | null }[];
-  ratingsSnapshot: { rating: string | null; ratingScore: number | null } | null;
-}
 
 const timeRanges = [
   { label: '1D', value: '1D', interval: '5' },
@@ -212,11 +184,15 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
   const [selectedRange, setSelectedRange] = useState('1M');
   const [isAIOpen, setIsAIOpen] = useState(false);
   const [isInWatchlist, setIsInWatchlist] = useState(false);
-  const [analystData, setAnalystData] = useState<AnalystData | null>(null);
-  const [analystLoading, setAnalystLoading] = useState(false);
   const [insiderData, setInsiderData] = useState<InsiderTradingData | null>(null);
   const [insiderLoading, setInsiderLoading] = useState(false);
   const [expandedInsiderWeeks, setExpandedInsiderWeeks] = useState<Set<string>>(new Set());
+  const [performanceData, setPerformanceData] = useState<{
+    '1W': number | null;
+    '1M': number | null;
+    '6M': number | null;
+    '1Y': number | null;
+  } | null>(null);
 
   const toggleInsiderWeek = (weekKey: string) => {
     setExpandedInsiderWeeks((prev) => {
@@ -279,19 +255,6 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
 
   useEffect(() => {
     if (!symbol) return;
-    setAnalystLoading(true);
-    fetch(`/api/stock-analyst?symbol=${symbol}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (!data.error) setAnalystData(data as AnalystData);
-        else setAnalystData(null);
-      })
-      .catch(() => setAnalystData(null))
-      .finally(() => setAnalystLoading(false));
-  }, [symbol]);
-
-  useEffect(() => {
-    if (!symbol) return;
     setInsiderLoading(true);
     fetch(`/api/insider-trading?symbol=${symbol}&limit=30`)
       .then((res) => res.json())
@@ -301,6 +264,23 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
       })
       .catch(() => setInsiderData(null))
       .finally(() => setInsiderLoading(false));
+  }, [symbol]);
+
+  useEffect(() => {
+    if (!symbol) return;
+    fetch(`/api/stock-performance?symbol=${symbol}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.error) {
+          setPerformanceData({
+            '1W': data['1W'] ?? null,
+            '1M': data['1M'] ?? null,
+            '6M': data['6M'] ?? null,
+            '1Y': data['1Y'] ?? null,
+          });
+        }
+      })
+      .catch(() => setPerformanceData(null));
   }, [symbol]);
 
   const fetchStockDetails = async () => {
@@ -525,45 +505,42 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
           </CardContent>
         </Card>
 
-        {/* Key Statistics + Related Stocks + 52-Week Range */}
+        {/* Performance + Related Stocks + 52-Week Range */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 gap-2 lg:col-span-1">
-            <Card className="overflow-hidden">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
-                  <Activity className="w-3 h-3 shrink-0" />
-                  <span className="text-[10px] font-medium uppercase tracking-wide">Open</span>
-                </div>
-                <div className="text-sm font-medium tabular-nums">${formatNumber(stockData.open)}</div>
-              </CardContent>
-            </Card>
-            <Card className="overflow-hidden">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
-                  <TrendingUp className="w-3 h-3 shrink-0" />
-                  <span className="text-[10px] font-medium uppercase tracking-wide">Day High</span>
-                </div>
-                <div className="text-sm font-medium tabular-nums">${formatNumber(stockData.high)}</div>
-              </CardContent>
-            </Card>
-            <Card className="overflow-hidden">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
-                  <TrendingDown className="w-3 h-3 shrink-0" />
-                  <span className="text-[10px] font-medium uppercase tracking-wide">Day Low</span>
-                </div>
-                <div className="text-sm font-medium tabular-nums">${formatNumber(stockData.low)}</div>
-              </CardContent>
-            </Card>
-            <Card className="overflow-hidden">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
-                  <Calendar className="w-3 h-3 shrink-0" />
-                  <span className="text-[10px] font-medium uppercase tracking-wide">Prev Close</span>
-                </div>
-                <div className="text-sm font-medium tabular-nums">${formatNumber(stockData.previousClose)}</div>
-              </CardContent>
-            </Card>
+            {[
+              { label: '7 Days', key: '1W' as const },
+              { label: '1 Month', key: '1M' as const },
+              { label: '6 Months', key: '6M' as const },
+              { label: '1 Year', key: '1Y' as const },
+            ].map(({ label, key }) => {
+              const value = performanceData?.[key];
+              const isPositive = value != null && value >= 0;
+              const isNegative = value != null && value < 0;
+              return (
+                <Card key={key} className="overflow-hidden">
+                  <CardContent className="p-3">
+                    <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
+                      {isPositive ? (
+                        <TrendingUp className="w-3 h-3 shrink-0 text-emerald-500" />
+                      ) : isNegative ? (
+                        <TrendingDown className="w-3 h-3 shrink-0 text-rose-500" />
+                      ) : (
+                        <Activity className="w-3 h-3 shrink-0" />
+                      )}
+                      <span className="text-[10px] font-medium uppercase tracking-wide">{label}</span>
+                    </div>
+                    <div className={cn(
+                      "text-sm font-semibold tabular-nums",
+                      isPositive && "text-emerald-500",
+                      isNegative && "text-rose-500"
+                    )}>
+                      {value != null ? `${isPositive ? '+' : ''}${value.toFixed(2)}%` : '—'}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
           <div className="lg:col-span-2 flex flex-col gap-3">
             <RelatedStocks symbol={stockData.symbol} compact />
@@ -590,11 +567,6 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
           </div>
         </div>
 
-        {/* Future earnings (upcoming dates + estimates, last reported) */}
-        <FutureEarnings
-          symbol={symbol}
-          quarterlyEstimates={analystData?.quarterlyEstimates ?? []}
-        />
 
         {/* P/E, P/B & P/S Donuts - based on market cap, earnings, book value, and sales */}
         {(() => {
@@ -605,164 +577,258 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
           const earnings = hasPE ? marketCap / stockData.pe! : 0;
           const bookValue = hasPB ? marketCap / stockData.priceToBook! : 0;
           const sales = hasPS ? marketCap / stockData.priceToSales! : 0;
-          const strokeColor = 'hsl(var(--card))';
+          
+          const VALUATION_COLORS = {
+            marketCap: '#6366f1',   // Indigo
+            earnings: '#f59e0b',    // Amber
+            bookValue: '#10b981',   // Emerald
+            sales: '#8b5cf6',       // Violet
+          };
+          
           const peData = hasPE
             ? [
-                { name: 'Market Cap', value: marketCap, fill: 'hsl(var(--primary))' },
-                { name: 'Earnings', value: earnings, fill: 'hsl(38 92% 50%)' }
+                { name: 'Market Cap', value: marketCap, color: VALUATION_COLORS.marketCap },
+                { name: 'Earnings', value: earnings, color: VALUATION_COLORS.earnings }
               ]
-            : [{ name: 'N/A', value: 1, fill: 'hsl(var(--muted))' }];
+            : [{ name: 'N/A', value: 1, color: 'hsl(var(--muted))' }];
           const pbData = hasPB ? [
-            { name: 'Market Cap', value: marketCap, fill: 'hsl(var(--primary))' },
-            { name: 'Book Value', value: bookValue, fill: 'hsl(173 58% 39%)' }
+            { name: 'Market Cap', value: marketCap, color: VALUATION_COLORS.marketCap },
+            { name: 'Book Value', value: bookValue, color: VALUATION_COLORS.bookValue }
           ] : [];
           const psData = hasPS ? [
-            { name: 'Market Cap', value: marketCap, fill: 'hsl(var(--primary))' },
-            { name: 'Sales', value: sales, fill: 'hsl(262 52% 47%)' }
+            { name: 'Market Cap', value: marketCap, color: VALUATION_COLORS.marketCap },
+            { name: 'Sales', value: sales, color: VALUATION_COLORS.sales }
           ] : [];
-          const tooltipStyle = {
-            fontSize: '12px',
-            borderRadius: 'var(--radius)',
-            border: '1px solid hsl(var(--border))',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-            padding: '8px 12px',
-            backgroundColor: 'hsl(var(--card))'
-          };
+          
           const showValuation = marketCap > 0;
+          
+          // Custom tooltip for valuation charts
+          const ValuationTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: { name: string; value: number; color: string } }> }) => {
+            if (!active || !payload || payload.length === 0) return null;
+            const data = payload[0].payload;
+            return (
+              <div className="bg-popover/95 backdrop-blur-sm border border-border rounded-lg shadow-xl px-4 py-3 min-w-[140px]">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: data.color }} />
+                  <span className="text-sm font-medium text-foreground">{data.name}</span>
+                </div>
+                <p className="text-lg font-bold text-foreground pl-4">{formatLargeNumber(data.value)}</p>
+              </div>
+            );
+          };
+          
           return showValuation ? (
             <Card className="mb-8 overflow-hidden">
               <CardContent className="pt-6">
-                <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
-                  <DollarSign className="w-5 h-5" />
-                  Valuation (P/E, P/B & P/S)
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10 justify-items-center">
-                  {/* P/E donut - always shown, same layout as P/B and P/S */}
+                {/* Header */}
+                <div className="flex items-start justify-between gap-4 mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5">
+                      <DollarSign className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold tracking-tight">Valuation Multiples</h2>
+                      <p className="text-sm text-muted-foreground">
+                        Price-to-Earnings, Book Value & Sales ratios
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 rounded-full">
+                    <span className="text-xs text-muted-foreground">Market Cap:</span>
+                    <span className="text-xs font-semibold text-foreground">{formatLargeNumber(marketCap)}</span>
+                  </div>
+                </div>
+
+                {/* Legend */}
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-6 pb-4 border-b border-border/50">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: VALUATION_COLORS.marketCap }} />
+                    <span className="text-xs text-muted-foreground">Market Cap</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: VALUATION_COLORS.earnings }} />
+                    <span className="text-xs text-muted-foreground">Earnings</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: VALUATION_COLORS.bookValue }} />
+                    <span className="text-xs text-muted-foreground">Book Value</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: VALUATION_COLORS.sales }} />
+                    <span className="text-xs text-muted-foreground">Sales</span>
+                  </div>
+                </div>
+
+                {/* Donut charts */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 justify-items-center">
+                  {/* P/E Donut */}
                   <div className="flex flex-col items-center">
-                    <p className="text-sm font-medium text-muted-foreground mb-3">P/E — Market Cap vs Earnings</p>
-                    <div className="relative w-[220px] h-[220px]">
+                    <div className="relative w-[200px] h-[200px]">
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+                          <defs>
+                            <linearGradient id="peMarketCapGrad" x1="0" y1="0" x2="1" y2="1">
+                              <stop offset="0%" stopColor="#818cf8" />
+                              <stop offset="100%" stopColor="#6366f1" />
+                            </linearGradient>
+                            <linearGradient id="peEarningsGrad" x1="0" y1="0" x2="1" y2="1">
+                              <stop offset="0%" stopColor="#fbbf24" />
+                              <stop offset="100%" stopColor="#f59e0b" />
+                            </linearGradient>
+                          </defs>
                           <Pie
                             data={peData}
                             cx="50%"
                             cy="50%"
-                            innerRadius={58}
-                            outerRadius={92}
+                            innerRadius={55}
+                            outerRadius={85}
                             dataKey="value"
-                            stroke={strokeColor}
-                            strokeWidth={2}
-                            paddingAngle={hasPE ? 4 : 0}
+                            stroke="hsl(var(--background))"
+                            strokeWidth={3}
+                            paddingAngle={hasPE ? 3 : 0}
                           >
                             {peData.map((entry, index) => (
-                              <Cell key={index} fill={entry.fill} />
+                              <Cell 
+                                key={index} 
+                                fill={hasPE ? (index === 0 ? 'url(#peMarketCapGrad)' : 'url(#peEarningsGrad)') : entry.color}
+                                style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }}
+                              />
                             ))}
                           </Pie>
-                          <Tooltip
-                            formatter={(value: number, _name, props: { payload?: { name: string } }) =>
-                              hasPE
-                                ? [formatLargeNumber(value), props.payload?.name ?? '']
-                                : ['—', props.payload?.name ?? '']
-                            }
-                            contentStyle={tooltipStyle}
-                            cursor={false}
-                          />
+                          <Tooltip content={<ValuationTooltip />} />
                         </PieChart>
                       </ResponsiveContainer>
                       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                        <div className="rounded-full w-[88px] h-[88px] flex flex-col items-center justify-center bg-card/80 border border-border/50 shadow-sm">
-                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">P/E</span>
-                          <span className="text-xl font-semibold tabular-nums mt-0.5">
-                            {hasPE ? formatNumber(stockData.pe!) : 'N/A'}
-                          </span>
-                        </div>
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">P/E Ratio</span>
+                        <span className="text-2xl font-bold tabular-nums mt-0.5">
+                          {hasPE ? formatNumber(stockData.pe!, 1) : 'N/A'}
+                        </span>
                       </div>
                     </div>
+                    <p className="text-xs text-muted-foreground mt-2 text-center">Market Cap vs Earnings</p>
                   </div>
+
+                  {/* P/B Donut */}
                   {hasPB && (
                     <div className="flex flex-col items-center">
-                      <p className="text-sm font-medium text-muted-foreground mb-3">P/B — Market Cap vs Book Value</p>
-                      <div className="relative w-[220px] h-[220px]">
+                      <div className="relative w-[200px] h-[200px]">
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+                            <defs>
+                              <linearGradient id="pbMarketCapGrad" x1="0" y1="0" x2="1" y2="1">
+                                <stop offset="0%" stopColor="#818cf8" />
+                                <stop offset="100%" stopColor="#6366f1" />
+                              </linearGradient>
+                              <linearGradient id="pbBookValueGrad" x1="0" y1="0" x2="1" y2="1">
+                                <stop offset="0%" stopColor="#34d399" />
+                                <stop offset="100%" stopColor="#10b981" />
+                              </linearGradient>
+                            </defs>
                             <Pie
                               data={pbData}
                               cx="50%"
                               cy="50%"
-                              innerRadius={58}
-                              outerRadius={92}
+                              innerRadius={55}
+                              outerRadius={85}
                               dataKey="value"
-                              stroke={strokeColor}
-                              strokeWidth={2}
-                              paddingAngle={4}
+                              stroke="hsl(var(--background))"
+                              strokeWidth={3}
+                              paddingAngle={3}
                             >
                               {pbData.map((entry, index) => (
-                                <Cell key={index} fill={entry.fill} />
+                                <Cell 
+                                  key={index} 
+                                  fill={index === 0 ? 'url(#pbMarketCapGrad)' : 'url(#pbBookValueGrad)'}
+                                  style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }}
+                                />
                               ))}
                             </Pie>
-                            <Tooltip
-                              formatter={(value: number, _name, props: { payload?: { name: string } }) => [
-                                formatLargeNumber(value),
-                                props.payload?.name ?? ''
-                              ]}
-                              contentStyle={tooltipStyle}
-                              cursor={false}
-                            />
+                            <Tooltip content={<ValuationTooltip />} />
                           </PieChart>
                         </ResponsiveContainer>
                         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                          <div className="rounded-full w-[88px] h-[88px] flex flex-col items-center justify-center bg-card/80 border border-border/50 shadow-sm">
-                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">P/B</span>
-                            <span className="text-xl font-semibold tabular-nums mt-0.5">
-                              {formatNumber(stockData.priceToBook!)}
-                            </span>
-                          </div>
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">P/B Ratio</span>
+                          <span className="text-2xl font-bold tabular-nums mt-0.5">
+                            {formatNumber(stockData.priceToBook!, 1)}
+                          </span>
                         </div>
                       </div>
+                      <p className="text-xs text-muted-foreground mt-2 text-center">Market Cap vs Book Value</p>
                     </div>
                   )}
+
+                  {/* P/S Donut */}
                   {hasPS && (
                     <div className="flex flex-col items-center">
-                      <p className="text-sm font-medium text-muted-foreground mb-3">P/S — Market Cap vs Sales</p>
-                      <div className="relative w-[220px] h-[220px]">
+                      <div className="relative w-[200px] h-[200px]">
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+                            <defs>
+                              <linearGradient id="psMarketCapGrad" x1="0" y1="0" x2="1" y2="1">
+                                <stop offset="0%" stopColor="#818cf8" />
+                                <stop offset="100%" stopColor="#6366f1" />
+                              </linearGradient>
+                              <linearGradient id="psSalesGrad" x1="0" y1="0" x2="1" y2="1">
+                                <stop offset="0%" stopColor="#a78bfa" />
+                                <stop offset="100%" stopColor="#8b5cf6" />
+                              </linearGradient>
+                            </defs>
                             <Pie
                               data={psData}
                               cx="50%"
                               cy="50%"
-                              innerRadius={58}
-                              outerRadius={92}
+                              innerRadius={55}
+                              outerRadius={85}
                               dataKey="value"
-                              stroke={strokeColor}
-                              strokeWidth={2}
-                              paddingAngle={4}
+                              stroke="hsl(var(--background))"
+                              strokeWidth={3}
+                              paddingAngle={3}
                             >
                               {psData.map((entry, index) => (
-                                <Cell key={index} fill={entry.fill} />
+                                <Cell 
+                                  key={index} 
+                                  fill={index === 0 ? 'url(#psMarketCapGrad)' : 'url(#psSalesGrad)'}
+                                  style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }}
+                                />
                               ))}
                             </Pie>
-                            <Tooltip
-                              formatter={(value: number, _name, props: { payload?: { name: string } }) => [
-                                formatLargeNumber(value),
-                                props.payload?.name ?? ''
-                              ]}
-                              contentStyle={tooltipStyle}
-                              cursor={false}
-                            />
+                            <Tooltip content={<ValuationTooltip />} />
                           </PieChart>
                         </ResponsiveContainer>
                         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                          <div className="rounded-full w-[88px] h-[88px] flex flex-col items-center justify-center bg-card/80 border border-border/50 shadow-sm">
-                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">P/S</span>
-                            <span className="text-xl font-semibold tabular-nums mt-0.5">
-                              {formatNumber(stockData.priceToSales!)}
-                            </span>
-                          </div>
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">P/S Ratio</span>
+                          <span className="text-2xl font-bold tabular-nums mt-0.5">
+                            {formatNumber(stockData.priceToSales!, 1)}
+                          </span>
                         </div>
                       </div>
+                      <p className="text-xs text-muted-foreground mt-2 text-center">Market Cap vs Sales</p>
                     </div>
                   )}
+                </div>
+
+                {/* Footer summary */}
+                <div className="mt-6 pt-4 border-t border-border/50">
+                  <div className="flex flex-wrap gap-4 text-xs">
+                    {hasPE && (
+                      <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/30 rounded-full">
+                        <span className="text-muted-foreground">Earnings:</span>
+                        <span className="font-semibold text-amber-500">{formatLargeNumber(earnings)}</span>
+                      </div>
+                    )}
+                    {hasPB && (
+                      <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/30 rounded-full">
+                        <span className="text-muted-foreground">Book Value:</span>
+                        <span className="font-semibold text-emerald-500">{formatLargeNumber(bookValue)}</span>
+                      </div>
+                    )}
+                    {hasPS && (
+                      <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/30 rounded-full">
+                        <span className="text-muted-foreground">Sales:</span>
+                        <span className="font-semibold text-violet-500">{formatLargeNumber(sales)}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -1030,200 +1096,6 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
           </Card>
         )}
 
-        {/* Analyst Outlook */}
-        {(analystLoading || analystData) && (
-          <Card className="mb-8">
-            <CardContent className="pt-6">
-              <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
-                <MessageSquare className="w-5 h-5" />
-                Analyst Outlook
-              </h3>
-              <p className="text-xs text-muted-foreground mb-6">
-                Analyst data (price targets, estimates, grades) can be limited by FMP plan or symbol coverage. If sections are empty, your plan may not include them for this symbol, or they may be limited to certain tickers—check FMP pricing for details.
-              </p>
-              {analystLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-                </div>
-              ) : analystData ? (
-                <div className="space-y-8">
-                  {/* Price Target Summary & Consensus - only show when at least one value exists */}
-                  {(() => {
-                    const hasConsensus = analystData.priceTargetConsensus?.consensus != null;
-                    const hasHigh = analystData.priceTargetConsensus?.high != null;
-                    const hasLow = analystData.priceTargetConsensus?.low != null;
-                    const hasAnalystCount = analystData.priceTargetSummary?.analystCount != null;
-                    const hasAnyPriceTarget = hasConsensus || hasHigh || hasLow || hasAnalystCount;
-                    return hasAnyPriceTarget ? (
-                    <div>
-                      <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
-                        <Target className="w-4 h-4" />
-                        Price targets
-                      </h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {analystData.priceTargetConsensus?.consensus != null && (
-                          <div className="rounded-lg border border-border p-3">
-                            <p className="text-xs text-muted-foreground">Consensus</p>
-                            <p className="text-lg font-semibold tabular-nums">${formatNumber(analystData.priceTargetConsensus.consensus!)}</p>
-                            {stockData && analystData.priceTargetConsensus.consensus != null && (
-                              <p className={cn("text-xs mt-1", (analystData.priceTargetConsensus.consensus - stockData.price) >= 0 ? "text-green-500" : "text-red-500")}>
-                                {((analystData.priceTargetConsensus.consensus - stockData.price) / stockData.price * 100).toFixed(1)}% vs current
-                              </p>
-                            )}
-                          </div>
-                        )}
-                        {analystData.priceTargetConsensus?.high != null && (
-                          <div className="rounded-lg border border-border p-3">
-                            <p className="text-xs text-muted-foreground">High</p>
-                            <p className="text-lg font-semibold tabular-nums">${formatNumber(analystData.priceTargetConsensus.high!)}</p>
-                          </div>
-                        )}
-                        {analystData.priceTargetConsensus?.low != null && (
-                          <div className="rounded-lg border border-border p-3">
-                            <p className="text-xs text-muted-foreground">Low</p>
-                            <p className="text-lg font-semibold tabular-nums">${formatNumber(analystData.priceTargetConsensus.low!)}</p>
-                          </div>
-                        )}
-                        {analystData.priceTargetSummary?.analystCount != null && (
-                          <div className="rounded-lg border border-border p-3">
-                            <p className="text-xs text-muted-foreground">Analysts</p>
-                            <p className="text-lg font-semibold tabular-nums">{analystData.priceTargetSummary.analystCount}</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    ) : null;
-                  })()}
-
-                  {/* Grades Consensus */}
-                  {analystData.gradesConsensus && (
-                    <div>
-                      <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
-                        <Award className="w-4 h-4" />
-                        Consensus ratings
-                      </h4>
-                      <div className="flex flex-wrap gap-2">
-                        {analystData.gradesConsensus.strongBuy > 0 && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-green-500/20 px-3 py-1 text-xs font-medium text-green-600 dark:text-green-400">
-                            Strong Buy {analystData.gradesConsensus.strongBuy}
-                          </span>
-                        )}
-                        {analystData.gradesConsensus.buy > 0 && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-green-500/10 px-3 py-1 text-xs font-medium text-green-600/90 dark:text-green-400/90">
-                            Buy {analystData.gradesConsensus.buy}
-                          </span>
-                        )}
-                        {analystData.gradesConsensus.hold > 0 && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
-                            Hold {analystData.gradesConsensus.hold}
-                          </span>
-                        )}
-                        {analystData.gradesConsensus.sell > 0 && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-3 py-1 text-xs font-medium text-red-600 dark:text-red-400">
-                            Sell {analystData.gradesConsensus.sell}
-                          </span>
-                        )}
-                        {analystData.gradesConsensus.strongSell > 0 && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-red-500/20 px-3 py-1 text-xs font-medium text-red-600 dark:text-red-400">
-                            Strong Sell {analystData.gradesConsensus.strongSell}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Analyst Estimates (forward revenue, EPS) */}
-                  {analystData.analystEstimates.length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
-                        <FileText className="w-4 h-4" />
-                        Forward estimates
-                      </h4>
-                      {/* Projection chart: revenue (bars) + EPS (line) by period */}
-                      {analystData.analystEstimates.some((e) => e.revenueEst != null || e.epsEst != null) && (
-                        <div className="mb-6 h-56">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <ComposedChart
-                              data={analystData.analystEstimates.map((e) => ({
-                                period: e.period ?? e.date ?? '—',
-                                revenue: e.revenueEst ?? 0,
-                                eps: e.epsEst ?? 0,
-                              }))}
-                              margin={{ top: 8, right: 40, left: 0, bottom: 8 }}
-                            >
-                              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                              <XAxis
-                                dataKey="period"
-                                tick={{ fontSize: 11 }}
-                                className="text-muted-foreground"
-                              />
-                              <YAxis
-                                yAxisId="revenue"
-                                orientation="left"
-                                tick={{ fontSize: 10 }}
-                                tickFormatter={(v) => (v >= 1e9 ? `${(v / 1e9).toFixed(1)}B` : v >= 1e6 ? `${(v / 1e6).toFixed(0)}M` : String(v))}
-                                className="text-muted-foreground"
-                              />
-                              <YAxis
-                                yAxisId="eps"
-                                orientation="right"
-                                tick={{ fontSize: 10 }}
-                                tickFormatter={(v) => `$${typeof v === 'number' ? v.toFixed(2) : v}`}
-                                className="text-muted-foreground"
-                              />
-                              <Tooltip
-                                contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
-                                formatter={(value: number, name: string) => [
-                                  name === 'revenue' ? formatLargeNumber(value) : `$${formatNumber(value)}`,
-                                  name === 'revenue' ? 'Revenue est.' : 'EPS est.',
-                                ]}
-                                labelFormatter={(label) => `Period: ${label}`}
-                              />
-                              <Bar yAxisId="revenue" dataKey="revenue" fill="hsl(var(--primary) / 0.6)" name="revenue" radius={[4, 4, 0, 0]} />
-                              <Line yAxisId="eps" type="monotone" dataKey="eps" stroke="hsl(var(--chart-2, 142 76% 36%))" strokeWidth={2} dot={{ r: 4 }} name="eps" />
-                              <Legend formatter={(value) => (value === 'revenue' ? 'Revenue est.' : 'EPS est.')} />
-                            </ComposedChart>
-                          </ResponsiveContainer>
-                        </div>
-                      )}
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b border-border">
-                              <th className="text-left py-2 font-medium text-muted-foreground">Period</th>
-                              <th className="text-right py-2 font-medium text-muted-foreground">Revenue Est.</th>
-                              <th className="text-right py-2 font-medium text-muted-foreground">EPS Est.</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {analystData.analystEstimates.map((e, i) => (
-                              <tr key={i} className="border-b border-border/50">
-                                <td className="py-2">{e.period ?? e.date ?? '—'}</td>
-                                <td className="text-right tabular-nums">{e.revenueEst != null ? formatLargeNumber(e.revenueEst) : '—'}</td>
-                                <td className="text-right tabular-nums">{e.epsEst != null ? `$${formatNumber(e.epsEst)}` : '—'}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Show message if no analyst data at all */}
-                  {!analystData.priceTargetSummary && !analystData.priceTargetConsensus && !analystData.gradesConsensus && analystData.analystEstimates.length === 0 && (
-                    <p className="text-sm text-muted-foreground">
-                      No analyst data returned for this symbol. Availability depends on your FMP plan and symbol coverage (some plans limit analyst data to certain tickers). See{" "}
-                      <a href="https://site.financialmodelingprep.com/developer/docs/pricing" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">
-                        FMP pricing
-                      </a>{" "}
-                      for what your plan includes.
-                    </p>
-                  )}
-                </div>
-              ) : null}
-            </CardContent>
-          </Card>
-        )}
 
         {/* Detailed Information */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
