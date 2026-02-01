@@ -554,8 +554,7 @@ export default function OptionsPage({ params }: { params: { symbol: string } }) 
 
         {/* Footer */}
         <footer className="mt-12 pt-8 border-t border-border text-center text-sm text-muted-foreground">
-          <p>Options data provided by Financial Modeling Prep (FMP)</p>
-          <p className="mt-1">Data is delayed and for informational purposes only. Not investment advice.</p>
+          <p>Data is delayed and for informational purposes only. Not investment advice.</p>
         </footer>
       </div>
     </main>

@@ -925,8 +925,7 @@ export default function CryptoPage({ params }: { params: { id: string } }) {
 
         {/* Footer */}
         <footer className="mt-16 pt-8 border-t border-border text-center text-sm text-muted-foreground">
-          <p>Data provided by CoinGecko API</p>
-          <p className="mt-1">Prices are delayed and for informational purposes only</p>
+          <p>Prices are delayed and for informational purposes only</p>
         </footer>
       </div>
     </div>

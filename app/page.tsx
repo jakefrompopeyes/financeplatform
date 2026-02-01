@@ -107,9 +107,7 @@ export default function Home() {
             {/* Footer */}
             <footer className="mt-16 pt-8 border-t border-border">
               <div className="text-center text-sm text-secondary">
-                <p>Stock data by Financial Modeling Prep (FMP) • Economic data by FRED • Crypto data by CoinGecko • Fed probabilities by Polymarket</p>
-                <p className="mt-1">VIX & Market Sentiment by FMP • Fear & Greed Index by Alternative.me</p>
-                <p className="mt-1">Stonkscan © {new Date().getFullYear()} · stonkscan.com</p>
+                <p>Stonkscan © {new Date().getFullYear()} · stonkscan.com</p>
               </div>
             </footer>
           </div>

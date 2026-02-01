@@ -562,61 +562,6 @@ export default function FearGreedIndex() {
           </Card>
         )}
       </div>
-
-      {/* Polymarket Prediction Markets Section */}
-      {sentimentData?.polymarketMarkets && sentimentData.polymarketMarkets.length > 0 && (
-        <div className="mt-8 space-y-4">
-          <h3 className="text-xl font-normal text-foreground">Market Predictions (Polymarket)</h3>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {sentimentData.polymarketMarkets.map((market, index) => (
-              <Card key={index}>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-normal text-foreground leading-tight">
-                    {market.question}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {/* Probabilities */}
-                  <div className="space-y-2">
-                    {market.probabilities.map((prob, pIndex) => (
-                      <div key={pIndex} className="space-y-1">
-                        <div className="flex justify-between text-xs">
-                          <span className="text-secondary">{prob.outcome}</span>
-                          <span className="text-foreground font-medium">{prob.probability.toFixed(1)}%</span>
-                        </div>
-                        <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all duration-300"
-                            style={{
-                              width: `${prob.probability}%`,
-                              backgroundColor: pIndex === 0 ? '#4A90E2' : '#7ED321'
-                            }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Market Info */}
-                  <div className="flex justify-between items-center pt-2 border-t border-border">
-                    <div className="text-xs text-muted-foreground">
-                      Volume: ${(market.volume / 1000000).toFixed(2)}M
-                    </div>
-                    <a
-                      href={market.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-blue-500 hover:text-blue-400 transition-colors"
-                    >
-                      View on Polymarket →
-                    </a>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
