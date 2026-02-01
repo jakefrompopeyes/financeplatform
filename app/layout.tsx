@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { Analytics } from "@vercel/analytics/next";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { Toaster } from "@/components/Toaster";
 import { CommandPalette } from "@/components/CommandPalette";
@@ -49,6 +50,7 @@ export default function RootLayout({
           {children}
           <Toaster />
           <CommandPalette />
+          <Analytics />
         </ThemeProvider>
       </body>
     </html>
