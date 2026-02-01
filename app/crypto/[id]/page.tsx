@@ -4,11 +4,11 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, TrendingDown, Activity, DollarSign, BarChart3, Calendar, Sparkles, ArrowLeft, ExternalLink, Coins, TrendingUp as TrendingUpIcon } from 'lucide-react';
+import { TrendingUp, TrendingDown, Activity, DollarSign, BarChart3, ArrowLeft, ExternalLink, Coins, TrendingUp as TrendingUpIcon, ChevronDown, Newspaper, Link2, Share2, Gauge } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import TradingViewWidget from '@/components/TradingViewWidget';
+import TradingViewWidget, { AVAILABLE_INDICATORS, IndicatorId } from '@/components/TradingViewWidget';
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 interface CryptoDetails {
@@ -42,7 +42,42 @@ interface CryptoDetails {
   historical30d: { date: string; price: number }[];
   historical1y: { date: string; price: number }[];
   timestamp: number;
+  marketCapRank?: number | null;
+  links?: {
+    homepage: string[];
+    blockchainSite: string[];
+    subredditUrl: string | null;
+    twitterScreenName: string | null;
+    reposUrl: string[];
+  };
+  communityData?: {
+    twitterFollowers: number | null;
+    redditSubscribers: number | null;
+    redditAccountsActive48h: number | null;
+  };
+  genesisDate?: string | null;
+  categories?: string[];
 }
+
+interface FearGreedData {
+  current: { value: number; rating: string };
+}
+
+interface NewsArticle {
+  title: string;
+  description: string;
+  url: string;
+  publishedAt: string;
+  source: { name: string };
+}
+
+const RELATED_COINS = [
+  { id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin' },
+  { id: 'ethereum', symbol: 'ETH', name: 'Ethereum' },
+  { id: 'solana', symbol: 'SOL', name: 'Solana' },
+  { id: 'ripple', symbol: 'XRP', name: 'XRP' },
+  { id: 'cardano', symbol: 'ADA', name: 'Cardano' },
+];
 
 const timeRanges = [
   { label: '1D', value: '1D', dataKey: 'historical1d' },
@@ -59,6 +94,23 @@ export default function CryptoPage({ params }: { params: { id: string } }) {
   const [error, setError] = useState<string | null>(null);
   const [selectedRange, setSelectedRange] = useState('1W');
   const [selectedChart, setSelectedChart] = useState<'tradingview' | 'custom'>('tradingview');
+  const [selectedIndicators, setSelectedIndicators] = useState<IndicatorId[]>([]);
+  const [showIndicatorMenu, setShowIndicatorMenu] = useState(false);
+  const [fearGreed, setFearGreed] = useState<FearGreedData | null>(null);
+  const [news, setNews] = useState<NewsArticle[]>([]);
+
+  const toggleIndicator = (indicatorId: IndicatorId) => {
+    setSelectedIndicators((prev) => {
+      if (prev.includes(indicatorId)) {
+        return prev.filter((id) => id !== indicatorId);
+      }
+      return [...prev, indicatorId];
+    });
+  };
+
+  const clearAllIndicators = () => {
+    setSelectedIndicators([]);
+  };
 
   const fetchCryptoDetails = async () => {
     setLoading(true);
@@ -86,6 +138,21 @@ export default function CryptoPage({ params }: { params: { id: string } }) {
     fetchCryptoDetails();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cryptoId]);
+
+  useEffect(() => {
+    fetch('/api/fear-greed-index')
+      .then((r) => r.json())
+      .then((d) => (d.current ? setFearGreed({ current: d.current }) : null))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!cryptoData?.symbol) return;
+    fetch(`/api/financial-news?symbol=${cryptoData.symbol}&limit=5`)
+      .then((r) => r.json())
+      .then((d) => setNews(d.articles || []))
+      .catch(() => setNews([]));
+  }, [cryptoData?.symbol]);
 
   useEffect(() => {
     // Add to recently viewed after data loads
@@ -200,11 +267,16 @@ export default function CryptoPage({ params }: { params: { id: string } }) {
                 />
               )}
               <div>
-                <div className="flex items-center gap-3 mb-2">
+                <div className="flex items-center gap-3 mb-2 flex-wrap">
                   <h1 className="text-4xl font-light">{cryptoData.symbol}</h1>
                   <span className="px-3 py-1 bg-secondary text-secondary-foreground rounded-full text-sm">
                     CRYPTO
                   </span>
+                  {cryptoData.marketCapRank != null && (
+                    <span className="px-3 py-1 bg-muted text-muted-foreground rounded-full text-sm">
+                      Rank #{cryptoData.marketCapRank}
+                    </span>
+                  )}
                 </div>
                 <p className="text-xl text-muted-foreground mb-1">{cryptoData.name}</p>
               </div>
@@ -277,29 +349,141 @@ export default function CryptoPage({ params }: { params: { id: string } }) {
         {selectedChart === 'tradingview' && (
           <Card className="mb-8">
             <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex gap-2">
-                  {timeRanges.map((range) => (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Indicator Selector */}
+                  <div className="relative">
                     <button
-                      key={range.value}
-                      onClick={() => setSelectedRange(range.value)}
+                      onClick={() => setShowIndicatorMenu(!showIndicatorMenu)}
                       className={cn(
-                        "px-4 py-1 rounded-md text-xs font-medium transition-colors",
-                        selectedRange === range.value
+                        "px-3 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5",
+                        selectedIndicators.length > 0
                           ? "bg-primary text-primary-foreground"
                           : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
                       )}
                     >
-                      {range.label}
+                      <Activity className="w-3.5 h-3.5" />
+                      Indicators
+                      {selectedIndicators.length > 0 && (
+                        <span className="ml-1 px-1.5 py-0.5 rounded-full bg-primary-foreground/20 text-[10px]">
+                          {selectedIndicators.length}
+                        </span>
+                      )}
+                      <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", showIndicatorMenu && "rotate-180")} />
                     </button>
-                  ))}
+                    
+                    {showIndicatorMenu && (
+                      <>
+                        {/* Backdrop to close menu */}
+                        <div 
+                          className="fixed inset-0 z-40" 
+                          onClick={() => setShowIndicatorMenu(false)}
+                        />
+                        {/* Dropdown Menu */}
+                        <div className="absolute left-0 top-full mt-2 z-50 w-64 bg-popover border border-border rounded-lg shadow-lg overflow-hidden">
+                          <div className="p-2 border-b border-border flex items-center justify-between">
+                            <span className="text-xs font-medium text-muted-foreground">Technical Indicators</span>
+                            {selectedIndicators.length > 0 && (
+                              <button
+                                onClick={clearAllIndicators}
+                                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                              >
+                                Clear all
+                              </button>
+                            )}
+                          </div>
+                          <div className="max-h-64 overflow-y-auto p-1">
+                            {AVAILABLE_INDICATORS.map((indicator) => {
+                              const isSelected = selectedIndicators.includes(indicator.id);
+                              return (
+                                <button
+                                  key={indicator.id}
+                                  onClick={() => toggleIndicator(indicator.id)}
+                                  className={cn(
+                                    "w-full flex items-start gap-3 p-2 rounded-md text-left transition-colors",
+                                    isSelected 
+                                      ? "bg-primary/10 text-primary" 
+                                      : "hover:bg-muted"
+                                  )}
+                                >
+                                  <div className={cn(
+                                    "w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors",
+                                    isSelected 
+                                      ? "bg-primary border-primary" 
+                                      : "border-muted-foreground/30"
+                                  )}>
+                                    {isSelected && (
+                                      <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                      </svg>
+                                    )}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-sm font-medium">{indicator.name}</div>
+                                    <div className="text-xs text-muted-foreground truncate">{indicator.description}</div>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Time Range Selector */}
+                  <div className="flex gap-1">
+                    {timeRanges.map((range) => (
+                      <button
+                        key={range.value}
+                        onClick={() => setSelectedRange(range.value)}
+                        className={cn(
+                          "px-3 py-1 rounded-md text-xs font-medium transition-colors",
+                          selectedRange === range.value
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                        )}
+                      >
+                        {range.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
+
+              {/* Selected Indicators Pills */}
+              {selectedIndicators.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {selectedIndicators.map((indicatorId) => {
+                    const indicator = AVAILABLE_INDICATORS.find(i => i.id === indicatorId);
+                    if (!indicator) return null;
+                    return (
+                      <span
+                        key={indicatorId}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs"
+                      >
+                        {indicator.name}
+                        <button
+                          onClick={() => toggleIndicator(indicatorId)}
+                          className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
+                          aria-label={`Remove ${indicator.name}`}
+                        >
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+
               <div className="w-full" style={{ height: '600px' }}>
                 <TradingViewWidget 
                   symbol={`BINANCE:${cryptoData.symbol}USDT`}
                   interval={selectedRange === '1D' ? '5' : selectedRange === '1W' ? '15' : 'D'}
                   range={selectedRange === '1D' ? '1D' : selectedRange === '1W' ? '1W' : selectedRange === '1M' ? '1M' : '12M'}
+                  indicators={selectedIndicators}
                 />
               </div>
             </CardContent>
@@ -410,6 +594,73 @@ export default function CryptoPage({ params }: { params: { id: string } }) {
                 <span className="text-xs font-medium">24h Volume</span>
               </div>
               <div className="text-2xl font-light">{formatLargeNumber(cryptoData.totalVolume)}</div>
+            </CardContent>
+          </Card>
+
+          {cryptoData.marketCap > 0 && cryptoData.totalVolume > 0 && (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                  <Gauge className="w-4 h-4" />
+                  <span className="text-xs font-medium">Vol / Market Cap</span>
+                </div>
+                <div className="text-2xl font-light">
+                  {((cryptoData.totalVolume / cryptoData.marketCap) * 100).toFixed(2)}%
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">24h liquidity ratio</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* Fear & Greed + Related in one row */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+          {fearGreed && (
+            <Card>
+              <CardContent className="pt-6">
+                <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                  <Gauge className="w-5 h-5" />
+                  Crypto Fear & Greed Index
+                </h3>
+                <div className="flex items-center gap-4">
+                  <div
+                    className={cn(
+                      "w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold",
+                      fearGreed.current.value <= 25 && "bg-red-500/20 text-red-500",
+                      fearGreed.current.value > 25 && fearGreed.current.value <= 45 && "bg-orange-500/20 text-orange-500",
+                      fearGreed.current.value > 45 && fearGreed.current.value <= 55 && "bg-yellow-500/20 text-yellow-600 dark:text-yellow-400",
+                      fearGreed.current.value > 55 && fearGreed.current.value <= 75 && "bg-lime-500/20 text-lime-600 dark:text-lime-400",
+                      fearGreed.current.value > 75 && "bg-green-500/20 text-green-500"
+                    )}
+                  >
+                    {fearGreed.current.value}
+                  </div>
+                  <div>
+                    <p className="font-medium">{fearGreed.current.rating}</p>
+                    <p className="text-sm text-muted-foreground">Market sentiment</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          <Card>
+            <CardContent className="pt-6">
+              <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                <Share2 className="w-5 h-5" />
+                Explore more coins
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {RELATED_COINS.filter((c) => c.id !== cryptoData.id).slice(0, 4).map((coin) => (
+                  <Link
+                    key={coin.id}
+                    href={`/crypto/${coin.id}`}
+                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-secondary/50 hover:bg-secondary text-sm transition-colors"
+                  >
+                    <span className="font-medium">{coin.symbol}</span>
+                    <span className="text-muted-foreground hidden sm:inline">{coin.name}</span>
+                  </Link>
+                ))}
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -543,6 +794,121 @@ export default function CryptoPage({ params }: { params: { id: string } }) {
             </CardContent>
           </Card>
         </div>
+
+        {/* Links & Community */}
+        {(cryptoData.links || cryptoData.communityData) && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            {cryptoData.links && (cryptoData.links.homepage?.length > 0 || cryptoData.links.blockchainSite?.length > 0 || cryptoData.links.subredditUrl || cryptoData.links.twitterScreenName) && (
+              <Card>
+                <CardContent className="pt-6">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <Link2 className="w-5 h-5" />
+                    Links
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {cryptoData.links.homepage?.filter(Boolean).slice(0, 2).map((url, i) => (
+                      <a
+                        key={i}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-secondary/50 hover:bg-secondary text-sm transition-colors"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Homepage
+                      </a>
+                    ))}
+                    {cryptoData.links.blockchainSite?.filter(Boolean).slice(0, 1).map((url, i) => (
+                      <a
+                        key={`block-${i}`}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-secondary/50 hover:bg-secondary text-sm transition-colors"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Block Explorer
+                      </a>
+                    ))}
+                    {cryptoData.links.subredditUrl && (
+                      <a
+                        href={cryptoData.links.subredditUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-secondary/50 hover:bg-secondary text-sm transition-colors"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Reddit
+                      </a>
+                    )}
+                    {cryptoData.links.twitterScreenName && (
+                      <a
+                        href={`https://twitter.com/${cryptoData.links.twitterScreenName}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-secondary/50 hover:bg-secondary text-sm transition-colors"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Twitter
+                      </a>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+            {cryptoData.communityData && (cryptoData.communityData.twitterFollowers != null || cryptoData.communityData.redditSubscribers != null) && (
+              <Card>
+                <CardContent className="pt-6">
+                  <h3 className="text-lg font-semibold mb-4">Community</h3>
+                  <div className="space-y-2 text-sm">
+                    {cryptoData.communityData.twitterFollowers != null && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Twitter followers</span>
+                        <span className="font-medium">{cryptoData.communityData.twitterFollowers.toLocaleString()}</span>
+                      </div>
+                    )}
+                    {cryptoData.communityData.redditSubscribers != null && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Reddit subscribers</span>
+                        <span className="font-medium">{cryptoData.communityData.redditSubscribers.toLocaleString()}</span>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+
+        {/* News */}
+        {news.length > 0 && (
+          <Card className="mb-8">
+            <CardContent className="pt-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Newspaper className="w-5 h-5" />
+                News for {cryptoData.symbol}
+              </h3>
+              <ul className="space-y-3">
+                {news.slice(0, 5).map((article, i) => (
+                  <li key={i}>
+                    <a
+                      href={article.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block p-3 rounded-lg hover:bg-muted/50 transition-colors group"
+                    >
+                      <span className="font-medium group-hover:text-primary">{article.title}</span>
+                      {article.description && (
+                        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{article.description}</p>
+                      )}
+                      <span className="text-xs text-muted-foreground mt-1 block">{article.source?.name}</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Description */}
         {cryptoData.description && (

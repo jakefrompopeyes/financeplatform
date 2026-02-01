@@ -12,7 +12,7 @@ import {
   CommandList,
   CommandSeparator,
 } from '@/components/ui/command';
-import { Search, Home, CreditCard, Moon, Sun, Keyboard, TrendingUp } from 'lucide-react';
+import { Search, Home, Moon, Sun, Keyboard, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function CommandPalette() {
@@ -125,15 +125,6 @@ export function CommandPalette() {
               <kbd className="ml-auto pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100">
                 <span className="text-xs">⌘</span>G
               </kbd>
-            </CommandItem>
-            <CommandItem
-              onSelect={() => runCommand(() => {
-                router.push('/subscription');
-                toast.success('Navigated to subscription');
-              })}
-            >
-              <CreditCard className="mr-2 h-4 w-4" />
-              <span>Go to Subscription</span>
             </CommandItem>
           </CommandGroup>
 

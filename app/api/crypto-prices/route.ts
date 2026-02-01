@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server';
 
+// Prevent Next.js from caching this route so prices stay fresh
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const COINGECKO_API_KEY = process.env.COINGECKO_API_KEY;
 const BASE_URL = 'https://api.coingecko.com/api/v3';
 
@@ -10,8 +14,7 @@ function normalizeImage(coin: { image?: string | { small?: string; large?: strin
 
 export async function GET() {
   try {
-    // Popular cryptocurrencies (aligned with price-ticker so watchlist/ticker get icons)
-    const cryptoIds = ['bitcoin', 'ethereum', 'solana', 'binancecoin', 'cardano', 'dogecoin', 'ripple', 'polkadot'];
+    const cryptoIds = ['bitcoin', 'ethereum', 'solana'];
     
     // Build API URL with or without API key
     const apiKeyParam = COINGECKO_API_KEY ? `&x_cg_demo_api_key=${COINGECKO_API_KEY}` : '';
@@ -20,9 +23,8 @@ export async function GET() {
     const marketsResponse = await fetch(
       `${BASE_URL}/coins/markets?vs_currency=usd&ids=${cryptoIds.join(',')}&order=market_cap_desc&sparkline=false&price_change_percentage=24h${apiKeyParam}`,
       {
-        headers: {
-          'Accept': 'application/json',
-        }
+        headers: { 'Accept': 'application/json' },
+        cache: 'no-store', // Always get fresh prices from CoinGecko
       }
     );
 
@@ -40,9 +42,8 @@ export async function GET() {
           const chart24hResponse = await fetch(
             `${BASE_URL}/coins/${coin.id}/market_chart?vs_currency=usd&days=1${apiKeyParam ? `&${apiKeyParam.slice(1)}` : ''}`,
             {
-              headers: {
-                'Accept': 'application/json',
-              }
+              headers: { 'Accept': 'application/json' },
+              cache: 'no-store',
             }
           );
 
@@ -50,9 +51,8 @@ export async function GET() {
           const chart7dResponse = await fetch(
             `${BASE_URL}/coins/${coin.id}/market_chart?vs_currency=usd&days=7${apiKeyParam ? `&${apiKeyParam.slice(1)}` : ''}`,
             {
-              headers: {
-                'Accept': 'application/json',
-              }
+              headers: { 'Accept': 'application/json' },
+              cache: 'no-store',
             }
           );
 
@@ -109,7 +109,11 @@ export async function GET() {
 
     console.log(`Fetched ${result.length} cryptocurrencies from CoinGecko with 24h charts`);
 
-    return NextResponse.json(result);
+    return NextResponse.json(result, {
+      headers: {
+        'Cache-Control': 'no-store, max-age=0', // Don't cache in browser
+      },
+    });
   } catch (error) {
     console.error('Error fetching crypto prices:', error);
     return NextResponse.json(

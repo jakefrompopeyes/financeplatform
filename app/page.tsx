@@ -1,16 +1,16 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import MarketOverview from '@/components/dashboard/MarketOverview';
+
+import logoSrc from '../reallogo/logo-transparent-png.png';
 import EconomicIndicators from '@/components/dashboard/EconomicIndicators';
-import RatePredictions from '@/components/dashboard/RatePredictions';
 import CryptoPrices from '@/components/dashboard/CryptoPrices';
 import FearGreedIndex from '@/components/dashboard/FearGreedIndex';
 import StockSearch from '@/components/dashboard/StockSearch';
 import Watchlist from '@/components/dashboard/Watchlist';
-import EarningsCalendar from '@/components/dashboard/EarningsCalendar';
 import PriceTickerCarousel from '@/components/dashboard/PriceTickerCarousel';
-import FinancialNews from '@/components/dashboard/FinancialNews';
 import MacroCharts from '@/components/dashboard/MacroCharts';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
@@ -25,6 +25,13 @@ export default function Home() {
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 mb-6">
             <div>
               <h1 className="text-4xl font-light text-foreground mb-2 flex items-center gap-3">
+                <Image
+                  src={logoSrc}
+                  alt="Stonkscan"
+                  width={40}
+                  height={40}
+                  className="object-contain"
+                />
                 Stonkscan
                 <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/40">
                   Beta
@@ -35,13 +42,13 @@ export default function Home() {
               </p>
             </div>
             <div className="flex items-center gap-4">
-              <ThemeToggle />
               <a
-                href="/subscription"
-                className="px-6 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors font-normal text-sm"
+                href="/screener"
+                className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
               >
-                Upgrade to Pro
+                Stock Screener
               </a>
+              <ThemeToggle />
             </div>
           </div>
           
@@ -95,30 +102,6 @@ export default function Home() {
             {/* Fear and Greed Index */}
             <section>
               <FearGreedIndex />
-            </section>
-
-            {/* Divider */}
-            <div className="border-t border-border"></div>
-
-            {/* Fed Decision Predictions */}
-            <section>
-              <RatePredictions />
-            </section>
-
-            {/* Divider */}
-            <div className="border-t border-border"></div>
-
-            {/* Financial News */}
-            <section>
-              <FinancialNews />
-            </section>
-
-            {/* Divider */}
-            <div className="border-t border-border"></div>
-
-            {/* Earnings Calendar */}
-            <section>
-              <EarningsCalendar />
             </section>
 
             {/* Footer */}

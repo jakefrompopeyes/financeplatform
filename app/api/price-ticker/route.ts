@@ -80,7 +80,7 @@ export async function GET() {
         console.error('FMP batch-quote error:', err);
       }
 
-      // 2) If no stocks yet, use v3 quote (free tier; supports multiple symbols in path)
+      // 2) If no stocks yet, try v3 quote with multi-symbol path (some plans support this)
       if (tickerItems.length === 0) {
         try {
           const v3Res = await fetch(
@@ -119,6 +119,48 @@ export async function GET() {
           }
         } catch (err) {
           console.error('FMP v3 quote error:', err);
+        }
+      }
+
+      // 3) Fallback: fetch each stock via stable quote?symbol= (works on free tier)
+      if (tickerItems.length === 0) {
+        const quotePromises = POPULAR_STOCKS.map((symbol) =>
+          fetch(
+            `${FMP_STABLE_URL}/quote?symbol=${encodeURIComponent(symbol)}&apikey=${FMP_API_KEY}`,
+            { cache: 'no-store' }
+          ).then((r) => r.json())
+        );
+        const quoteResults = await Promise.all(quotePromises);
+        for (let i = 0; i < quoteResults.length; i++) {
+          const raw = quoteResults[i];
+          const arr = Array.isArray(raw) ? raw : raw?.data ?? raw?.quote ?? (raw ? [raw] : []);
+          const q = arr[0];
+          if (q?.symbol && (q?.price != null || q?.last != null)) {
+            const price = parseFloat(q.price ?? q.last ?? q.close ?? 0);
+            const prevClose = parseFloat(q.previousClose ?? q.dayBefore ?? price);
+            const change =
+              typeof q.change === 'number'
+                ? q.change
+                : typeof q.change === 'string'
+                  ? parseFloat(q.change) || 0
+                  : price - prevClose;
+            const changePercent =
+              typeof q.changesPercentage === 'number'
+                ? q.changesPercentage
+                : prevClose !== 0
+                  ? (change / prevClose) * 100
+                  : 0;
+            const symbol = (q.symbol || '').toUpperCase();
+            tickerItems.push({
+              symbol,
+              name: q.name || q.symbol || '',
+              price,
+              change,
+              changePercent,
+              type: 'stock' as const,
+              image: `${LOGO_BASE}/${symbol}.png`
+            });
+          }
         }
       }
     }

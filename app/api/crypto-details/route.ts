@@ -50,9 +50,9 @@ export async function GET(request: Request) {
 
     const apiKeyParam = COINGECKO_API_KEY ? `&x_cg_demo_api_key=${COINGECKO_API_KEY}` : '';
 
-    // Fetch detailed coin data
+    // Fetch detailed coin data (include community_data and links for extra sections)
     const coinResponse = await fetch(
-      `${BASE_URL}/coins/${coinId}?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false${apiKeyParam ? `&${apiKeyParam.slice(1)}` : ''}`,
+      `${BASE_URL}/coins/${coinId}?localization=false&tickers=false&market_data=true&community_data=true&developer_data=false&sparkline=false${apiKeyParam ? `&${apiKeyParam.slice(1)}` : ''}`,
       {
         headers: {
           'Accept': 'application/json',
@@ -91,6 +91,9 @@ export async function GET(request: Request) {
       }));
     };
 
+    const links = coinData.links || {};
+    const communityData = coinData.community_data || {};
+
     const result = {
       id: coinData.id,
       symbol: coinData.symbol.toUpperCase(),
@@ -122,6 +125,21 @@ export async function GET(request: Request) {
       historical30d: formatHistorical(chart30d),
       historical1y: formatHistorical(chart1y),
       timestamp: Date.now(),
+      marketCapRank: coinData.market_cap_rank ?? marketData.market_cap_rank ?? null,
+      links: {
+        homepage: (links.homepage && links.homepage.filter(Boolean)) || [],
+        blockchainSite: (links.blockchain_site && links.blockchain_site.filter(Boolean)) || [],
+        subredditUrl: links.subreddit_url || null,
+        twitterScreenName: links.twitter_screen_name || null,
+        reposUrl: links.repos_url?.github?.filter(Boolean) || [],
+      },
+      communityData: {
+        twitterFollowers: communityData.twitter_followers ?? null,
+        redditSubscribers: communityData.reddit_subscribers ?? null,
+        redditAccountsActive48h: communityData.reddit_accounts_active_48h ?? null,
+      },
+      genesisDate: coinData.genesis_date || null,
+      categories: coinData.categories || [],
     };
 
     return NextResponse.json(result);

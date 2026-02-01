@@ -28,31 +28,32 @@ export default function CryptoPrices() {
   const [data, setData] = useState<CryptoData[]>([]);
   const [loading, setLoading] = useState(true);
   const [flippedCards, setFlippedCards] = useState<Set<string>>(new Set());
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  const fetchData = async () => {
+    try {
+      const response = await fetch('/api/crypto-prices', { cache: 'no-store' });
+      const result = await response.json();
+
+      if (result.error) {
+        console.error('API Error:', result.error);
+        setData([]);
+      } else if (Array.isArray(result)) {
+        setData(result);
+        setLastUpdated(new Date());
+      } else {
+        console.error('Invalid data format:', result);
+        setData([]);
+      }
+    } catch (error) {
+      console.error('Error fetching crypto prices:', error);
+      setData([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await fetch('/api/crypto-prices');
-        const result = await response.json();
-        
-        if (result.error) {
-          console.error('API Error:', result.error);
-          setData([]);
-        } else if (Array.isArray(result)) {
-          console.log('Crypto Prices Data:', result);
-          setData(result);
-        } else {
-          console.error('Invalid data format:', result);
-          setData([]);
-        }
-      } catch (error) {
-        console.error('Error fetching crypto prices:', error);
-        setData([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchData();
     const interval = setInterval(fetchData, 60000); // Refresh every 1 minute
     return () => clearInterval(interval);
@@ -109,7 +110,14 @@ export default function CryptoPrices() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-2xl font-normal text-foreground">Cryptocurrency Prices</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-2xl font-normal text-foreground">Cryptocurrency Prices</h2>
+        {lastUpdated && (
+          <span className="text-xs text-muted-foreground">
+            Updated {lastUpdated.toLocaleTimeString()}
+          </span>
+        )}
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {data.map((crypto) => {
           const isPositive = crypto.priceChangePercentage24h >= 0;

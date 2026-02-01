@@ -3,13 +3,30 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTheme } from 'next-themes';
 
+// Available indicators for TradingView
+export const AVAILABLE_INDICATORS = [
+  { id: 'RSI@tv-basicstudies', name: 'RSI', description: 'Relative Strength Index' },
+  { id: 'MACD@tv-basicstudies', name: 'MACD', description: 'Moving Average Convergence Divergence' },
+  { id: 'BB@tv-basicstudies', name: 'Bollinger Bands', description: 'Price volatility bands' },
+  { id: 'MASimple@tv-basicstudies', name: 'SMA', description: 'Simple Moving Average' },
+  { id: 'MAExp@tv-basicstudies', name: 'EMA', description: 'Exponential Moving Average' },
+  { id: 'Volume@tv-basicstudies', name: 'Volume', description: 'Trading volume' },
+  { id: 'VWAP@tv-basicstudies', name: 'VWAP', description: 'Volume Weighted Average Price' },
+  { id: 'StochasticRSI@tv-basicstudies', name: 'Stochastic RSI', description: 'Momentum oscillator' },
+  { id: 'ADX@tv-basicstudies', name: 'ADX', description: 'Average Directional Index' },
+  { id: 'ATR@tv-basicstudies', name: 'ATR', description: 'Average True Range' },
+] as const;
+
+export type IndicatorId = typeof AVAILABLE_INDICATORS[number]['id'];
+
 interface TradingViewWidgetProps {
   symbol: string;
   interval?: string;
   range?: string;
+  indicators?: IndicatorId[];
 }
 
-export default function TradingViewWidget({ symbol, interval = 'D', range = '1M' }: TradingViewWidgetProps) {
+export default function TradingViewWidget({ symbol, interval = 'D', range = '1M', indicators = [] }: TradingViewWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetRef = useRef<any>(null);
   const { theme, systemTheme } = useTheme();
@@ -53,7 +70,7 @@ export default function TradingViewWidget({ symbol, interval = 'D', range = '1M'
             height: 600,
             width: '100%',
             hide_side_toolbar: false,
-            studies: [],
+            studies: indicators,
             show_popup_button: false,
             popup_width: '1000',
             popup_height: '650',
@@ -93,7 +110,7 @@ export default function TradingViewWidget({ symbol, interval = 'D', range = '1M'
         }
       }
     };
-  }, [symbol, interval, range, containerId, currentTheme]);
+  }, [symbol, interval, range, containerId, currentTheme, indicators]);
 
   return (
     <div 

@@ -15,9 +15,11 @@ import RevenueEarningsChart from '@/components/dashboard/RevenueEarningsChart';
 import BalanceSheetSnapshot from '@/components/dashboard/BalanceSheetSnapshot';
 import DividendBuyback from '@/components/dashboard/DividendBuyback';
 import PeerComparison from '@/components/dashboard/PeerComparison';
+import AnalystRatings from '@/components/dashboard/AnalystRatings';
+import SECFilings from '@/components/dashboard/SECFilings';
 import Link from 'next/link';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import TradingViewWidget from '@/components/TradingViewWidget';
+import TradingViewWidget, { AVAILABLE_INDICATORS, IndicatorId } from '@/components/TradingViewWidget';
 import { toast } from 'sonner';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis } from 'recharts';
 
@@ -193,6 +195,8 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
     '6M': number | null;
     '1Y': number | null;
   } | null>(null);
+  const [selectedIndicators, setSelectedIndicators] = useState<IndicatorId[]>([]);
+  const [showIndicatorMenu, setShowIndicatorMenu] = useState(false);
 
   const toggleInsiderWeek = (weekKey: string) => {
     setExpandedInsiderWeeks((prev) => {
@@ -201,6 +205,19 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
       else next.add(weekKey);
       return next;
     });
+  };
+
+  const toggleIndicator = (indicatorId: IndicatorId) => {
+    setSelectedIndicators((prev) => {
+      if (prev.includes(indicatorId)) {
+        return prev.filter((id) => id !== indicatorId);
+      }
+      return [...prev, indicatorId];
+    });
+  };
+
+  const clearAllIndicators = () => {
+    setSelectedIndicators([]);
   };
 
   const syncWatchlistState = useCallback(() => {
@@ -424,7 +441,6 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
                 </div>
               </div>
               <p className="text-xl text-muted-foreground mb-1">{stockData.name}</p>
-              <p className="text-sm text-muted-foreground">Currency: {stockData.currency}</p>
             </div>
 
             <div className="text-left lg:text-right">
@@ -451,6 +467,12 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
               <Sparkles className="w-4 h-4" />
               Ask AI About {stockData.symbol}
             </Button>
+            <Link href={`/options/${stockData.symbol}`}>
+              <Button variant="outline" className="gap-2">
+                <Activity className="w-4 h-4" />
+                Options Chain
+              </Button>
+            </Link>
             <Button variant="outline" onClick={toggleWatchlist} className="gap-2">
               <Star className={cn("w-4 h-4", isInWatchlist && "fill-current")} />
               {isInWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
@@ -472,25 +494,136 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
         {/* TradingView Chart */}
         <Card className="mb-8">
           <CardContent className="pt-6">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
               <h2 className="text-lg font-semibold">Price Chart</h2>
-              <div className="flex gap-2">
-                {timeRanges.map((range) => (
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Indicator Selector */}
+                <div className="relative">
                   <button
-                    key={range.value}
-                    onClick={() => setSelectedRange(range.value)}
+                    onClick={() => setShowIndicatorMenu(!showIndicatorMenu)}
                     className={cn(
-                      "px-4 py-1 rounded-md text-xs font-medium transition-colors",
-                      selectedRange === range.value
+                      "px-3 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5",
+                      selectedIndicators.length > 0
                         ? "bg-primary text-primary-foreground"
                         : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
                     )}
                   >
-                    {range.label}
+                    <Activity className="w-3.5 h-3.5" />
+                    Indicators
+                    {selectedIndicators.length > 0 && (
+                      <span className="ml-1 px-1.5 py-0.5 rounded-full bg-primary-foreground/20 text-[10px]">
+                        {selectedIndicators.length}
+                      </span>
+                    )}
+                    <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", showIndicatorMenu && "rotate-180")} />
                   </button>
-                ))}
+                  
+                  {showIndicatorMenu && (
+                    <>
+                      {/* Backdrop to close menu */}
+                      <div 
+                        className="fixed inset-0 z-40" 
+                        onClick={() => setShowIndicatorMenu(false)}
+                      />
+                      {/* Dropdown Menu */}
+                      <div className="absolute right-0 top-full mt-2 z-50 w-64 bg-popover border border-border rounded-lg shadow-lg overflow-hidden">
+                        <div className="p-2 border-b border-border flex items-center justify-between">
+                          <span className="text-xs font-medium text-muted-foreground">Technical Indicators</span>
+                          {selectedIndicators.length > 0 && (
+                            <button
+                              onClick={clearAllIndicators}
+                              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                              Clear all
+                            </button>
+                          )}
+                        </div>
+                        <div className="max-h-64 overflow-y-auto p-1">
+                          {AVAILABLE_INDICATORS.map((indicator) => {
+                            const isSelected = selectedIndicators.includes(indicator.id);
+                            return (
+                              <button
+                                key={indicator.id}
+                                onClick={() => toggleIndicator(indicator.id)}
+                                className={cn(
+                                  "w-full flex items-start gap-3 p-2 rounded-md text-left transition-colors",
+                                  isSelected 
+                                    ? "bg-primary/10 text-primary" 
+                                    : "hover:bg-muted"
+                                )}
+                              >
+                                <div className={cn(
+                                  "w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors",
+                                  isSelected 
+                                    ? "bg-primary border-primary" 
+                                    : "border-muted-foreground/30"
+                                )}>
+                                  {isSelected && (
+                                    <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-sm font-medium">{indicator.name}</div>
+                                  <div className="text-xs text-muted-foreground truncate">{indicator.description}</div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Time Range Selector */}
+                <div className="flex gap-1">
+                  {timeRanges.map((range) => (
+                    <button
+                      key={range.value}
+                      onClick={() => setSelectedRange(range.value)}
+                      className={cn(
+                        "px-3 py-1 rounded-md text-xs font-medium transition-colors",
+                        selectedRange === range.value
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                      )}
+                    >
+                      {range.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
+
+            {/* Selected Indicators Pills */}
+            {selectedIndicators.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {selectedIndicators.map((indicatorId) => {
+                  const indicator = AVAILABLE_INDICATORS.find(i => i.id === indicatorId);
+                  if (!indicator) return null;
+                  return (
+                    <span
+                      key={indicatorId}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs"
+                    >
+                      {indicator.name}
+                      <button
+                        onClick={() => toggleIndicator(indicatorId)}
+                        className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
+                        aria-label={`Remove ${indicator.name}`}
+                      >
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+
             <div className="w-full" style={{ height: '600px' }}>
               <TradingViewWidget 
                 symbol={
@@ -500,6 +633,7 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
                 }
                 interval={timeRanges.find(r => r.value === selectedRange)?.interval || 'D'}
                 range={selectedRange}
+                indicators={selectedIndicators}
               />
             </div>
           </CardContent>
@@ -856,6 +990,9 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
         {/* Peer Comparison (margins) */}
         <PeerComparison symbol={symbol} peerSymbols={[]} maxPeers={2} />
 
+        {/* Analyst Ratings & Price Targets */}
+        <AnalystRatings symbol={symbol} />
+
         {/* Insider Trading */}
         {(insiderLoading || insiderData !== null) && (
           <Card className="mb-8">
@@ -1096,6 +1233,8 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
           </Card>
         )}
 
+        {/* SEC Filings */}
+        <SECFilings symbol={symbol} />
 
         {/* Detailed Information */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
