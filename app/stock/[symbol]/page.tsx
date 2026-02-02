@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, TrendingDown, Activity, DollarSign, BarChart3, Sparkles, ArrowLeft, Star, Share2, UserCheck, ExternalLink, ChevronDown, ChevronRight } from 'lucide-react';
+import { TrendingUp, TrendingDown, Activity, DollarSign, BarChart3, Sparkles, ArrowLeft, Star, Share2, UserCheck, ExternalLink, ChevronDown, ChevronRight, Calculator } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import StockAI from '@/components/dashboard/StockAI';
 import RelatedStocks from '@/components/dashboard/RelatedStocks';
@@ -15,8 +15,9 @@ import RevenueEarningsChart from '@/components/dashboard/RevenueEarningsChart';
 import BalanceSheetSnapshot from '@/components/dashboard/BalanceSheetSnapshot';
 import DividendBuyback from '@/components/dashboard/DividendBuyback';
 import PeerComparison from '@/components/dashboard/PeerComparison';
-import AnalystRatings from '@/components/dashboard/AnalystRatings';
 import SECFilings from '@/components/dashboard/SECFilings';
+import DCFValuation from '@/components/dashboard/DCFValuation';
+import FuturePriceModel from '@/components/dashboard/FuturePriceModel';
 import Link from 'next/link';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import TradingViewWidget, { AVAILABLE_INDICATORS, IndicatorId } from '@/components/TradingViewWidget';
@@ -185,6 +186,7 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
   const [errorDetails, setErrorDetails] = useState<{ code?: number; retryAfter?: number; symbol?: string } | null>(null);
   const [selectedRange, setSelectedRange] = useState('1M');
   const [isAIOpen, setIsAIOpen] = useState(false);
+  const [isFuturePriceOpen, setIsFuturePriceOpen] = useState(false);
   const [isInWatchlist, setIsInWatchlist] = useState(false);
   const [insiderData, setInsiderData] = useState<InsiderTradingData | null>(null);
   const [insiderLoading, setInsiderLoading] = useState(false);
@@ -473,6 +475,10 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
                 Options Chain
               </Button>
             </Link>
+            <Button variant="outline" onClick={() => setIsFuturePriceOpen(true)} className="gap-2">
+              <Calculator className="w-4 h-4" />
+              Future Price Model
+            </Button>
             <Button variant="outline" onClick={toggleWatchlist} className="gap-2">
               <Star className={cn("w-4 h-4", isInWatchlist && "fill-current")} />
               {isInWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
@@ -489,6 +495,16 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
           stockData={stockData}
           isOpen={isAIOpen}
           onClose={() => setIsAIOpen(false)}
+        />
+
+        {/* Future Price Model */}
+        <FuturePriceModel
+          symbol={stockData.symbol}
+          currentPrice={stockData.price}
+          eps={stockData.eps}
+          pe={stockData.pe}
+          open={isFuturePriceOpen}
+          onOpenChange={setIsFuturePriceOpen}
         />
 
         {/* TradingView Chart */}
@@ -702,7 +718,8 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
         </div>
 
 
-        {/* P/E, P/B & P/S Donuts - based on market cap, earnings, book value, and sales */}
+        {/* Valuation Multiples + DCF (side by side) */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
         {(() => {
           const marketCap = stockData.marketCap ?? 0;
           const hasPE = stockData.pe != null && stockData.pe > 0 && marketCap > 0;
@@ -752,7 +769,7 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
           };
           
           return showValuation ? (
-            <Card className="mb-8 overflow-hidden">
+            <Card className="overflow-hidden">
               <CardContent className="pt-6">
                 {/* Header */}
                 <div className="flex items-start justify-between gap-4 mb-6">
@@ -966,14 +983,16 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
                 </div>
               </CardContent>
             </Card>
-          ) : null;
+          ) : <div />;
         })()}
+        <DCFValuation symbol={symbol} currentPrice={stockData.price} />
+        </div>
 
-        {/* Revenue → Earnings Waterfall */}
-        <IncomeWaterfall symbol={symbol} />
-
-        {/* Cash Flow Waterfall */}
-        <CashFlowWaterfall symbol={symbol} />
+        {/* Revenue → Earnings Waterfall + Cash Flow Waterfall (side by side) */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
+          <IncomeWaterfall symbol={symbol} />
+          <CashFlowWaterfall symbol={symbol} />
+        </div>
 
         {/* Margin Trends + Revenue vs Net Income */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
@@ -989,9 +1008,6 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
 
         {/* Peer Comparison (margins) */}
         <PeerComparison symbol={symbol} peerSymbols={[]} maxPeers={2} />
-
-        {/* Analyst Ratings & Price Targets */}
-        <AnalystRatings symbol={symbol} />
 
         {/* Insider Trading */}
         {(insiderLoading || insiderData !== null) && (

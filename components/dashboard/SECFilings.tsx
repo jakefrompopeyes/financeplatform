@@ -19,11 +19,16 @@ interface SECFiling {
 interface SECFilingsData {
   symbol: string;
   filings: SECFiling[];
+  error?: string;
+  planUpgradeRequired?: boolean;
+  supportedSymbolsHint?: boolean;
 }
 
 export default function SECFilings({ symbol }: { symbol: string }) {
   const [data, setData] = useState<SECFilingsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [planLimited, setPlanLimited] = useState(false);
   const [expandedTypes, setExpandedTypes] = useState<Set<string>>(new Set(['8-K']));
   const [showAll, setShowAll] = useState(false);
 
@@ -31,16 +36,26 @@ export default function SECFilings({ symbol }: { symbol: string }) {
     if (!symbol) return;
     
     setLoading(true);
+    setError(null);
+    setPlanLimited(false);
+    
     fetch(`/api/sec-filings?symbol=${symbol}&limit=30`)
       .then((res) => res.json())
       .then((data) => {
-        if (!data.error && data.filings) {
+        if (data.error) {
+          setError(data.error);
+          setPlanLimited(data.planUpgradeRequired || data.supportedSymbolsHint || false);
+          setData(null);
+        } else if (data.filings && data.filings.length > 0) {
           setData(data);
         } else {
           setData(null);
         }
       })
-      .catch(() => setData(null))
+      .catch(() => {
+        setError('Failed to load SEC filings');
+        setData(null);
+      })
       .finally(() => setLoading(false));
   }, [symbol]);
 
@@ -59,6 +74,34 @@ export default function SECFilings({ symbol }: { symbol: string }) {
         <CardContent className="pt-6">
           <div className="flex justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Show plan limitation message
+  if (planLimited && error) {
+    return (
+      <Card className="mb-8">
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5">
+              <FileText className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold tracking-tight">SEC Filings</h2>
+              <p className="text-sm text-muted-foreground">Recent regulatory filings and disclosures</p>
+            </div>
+          </div>
+          <div className="rounded-lg bg-muted/50 border border-border p-4">
+            <p className="text-sm text-muted-foreground mb-2">
+              SEC filings for <span className="font-semibold">{symbol}</span> are not available on the current FMP Starter plan.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              The Starter plan supports SEC filings for ~87 major stocks (AAPL, MSFT, TSLA, GOOGL, etc.). 
+              Upgrade to Premium or Ultimate for full coverage.
+            </p>
           </div>
         </CardContent>
       </Card>
