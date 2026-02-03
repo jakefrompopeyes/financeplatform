@@ -38,7 +38,7 @@ export default function Home() {
                 </span>
               </h1>
               <p className="text-secondary">
-                Real-time financial market analytics and insights · stonkscan.com
+                Real-time financial market analytics and insights · {process.env.NEXT_PUBLIC_SITE_URL ? new URL(process.env.NEXT_PUBLIC_SITE_URL).host : 'stonkscan.com'}
               </p>
             </div>
             <div className="flex items-center gap-4">
@@ -107,7 +107,7 @@ export default function Home() {
             {/* Footer */}
             <footer className="mt-16 pt-8 border-t border-border">
               <div className="text-center text-sm text-secondary">
-                <p>Stonkscan © {new Date().getFullYear()} · stonkscan.com</p>
+                <p>Stonkscan © {new Date().getFullYear()} · {process.env.NEXT_PUBLIC_SITE_URL ? new URL(process.env.NEXT_PUBLIC_SITE_URL).host : 'stonkscan.com'}</p>
               </div>
             </footer>
           </div>

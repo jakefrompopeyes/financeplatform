@@ -4,17 +4,25 @@ import { useEffect, useState, useCallback, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, TrendingDown, Activity, DollarSign, BarChart3, Sparkles, ArrowLeft, Star, Share2, UserCheck, ExternalLink, ChevronDown, ChevronRight, Calculator } from 'lucide-react';
+import { TrendingUp, TrendingDown, Activity, Sparkles, ArrowLeft, Star, Share2, ExternalLink, ChevronDown, ChevronRight, Calculator, HelpCircle } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import StockAI from '@/components/dashboard/StockAI';
 import RelatedStocks from '@/components/dashboard/RelatedStocks';
+import CompanyProfile from '@/components/dashboard/CompanyProfile';
+import StockNews from '@/components/dashboard/StockNews';
 import IncomeWaterfall from '@/components/dashboard/IncomeWaterfall';
 import CashFlowWaterfall from '@/components/dashboard/CashFlowWaterfall';
 import MarginTrends from '@/components/dashboard/MarginTrends';
 import RevenueEarningsChart from '@/components/dashboard/RevenueEarningsChart';
 import BalanceSheetSnapshot from '@/components/dashboard/BalanceSheetSnapshot';
 import DividendBuyback from '@/components/dashboard/DividendBuyback';
-import PeerComparison from '@/components/dashboard/PeerComparison';
 import SECFilings from '@/components/dashboard/SECFilings';
 import DCFValuation from '@/components/dashboard/DCFValuation';
 import FuturePriceModel from '@/components/dashboard/FuturePriceModel';
@@ -114,6 +122,57 @@ interface InsiderTradeGroup {
   weekTrades: InsiderTrade[];
 }
 
+/** SEC Form 4 transaction type codes and common API labels → full name + explanation for insider trading card */
+const INSIDER_TRANSACTION_TYPES: { code: string; name: string; description: string; category: 'buy' | 'sell' | 'other' }[] = [
+  { code: 'P', name: 'Purchase', description: 'Open market or private purchase of securities', category: 'buy' },
+  { code: 'S', name: 'Sale', description: 'Open market or private sale of securities', category: 'sell' },
+  { code: 'A', name: 'Grant, award, or other acquisition', description: 'Grant, award, or other acquisition from the company (e.g. RSU/option grant)', category: 'buy' },
+  { code: 'D', name: 'Disposition to company', description: 'Disposition to the company (shares returned to issuer)', category: 'sell' },
+  { code: 'F', name: 'Tax withholding / exercise payment', description: 'Tax withholding or payment of exercise price by delivering/withholding shares', category: 'other' },
+  { code: 'G', name: 'Gift', description: 'Bona fide gift', category: 'other' },
+  { code: 'M', name: 'Exercise or conversion of derivative', description: 'Exercise or conversion of derivative security (e.g. options)', category: 'buy' },
+  { code: 'O', name: 'Exercise out-of-the-money derivative', description: 'Exercise of out-of-the-money derivative security', category: 'buy' },
+  { code: 'X', name: 'Exercise in-the-money derivative', description: 'Exercise of in-the-money or at-the-money derivative security', category: 'buy' },
+  { code: 'C', name: 'Conversion of derivative', description: 'Conversion of derivative security (e.g. convertible)', category: 'buy' },
+  { code: 'E', name: 'Expiration of short derivative', description: 'Expiration of short derivative position', category: 'sell' },
+  { code: 'H', name: 'Expiration/cancellation of long derivative', description: 'Expiration or cancellation of long derivative with value received', category: 'other' },
+  { code: 'I', name: 'Discretionary (benefit plan)', description: 'Discretionary transaction in employee benefit plan', category: 'other' },
+  { code: 'J', name: 'Other (see filing)', description: 'Other acquisition or disposition (see filing for details)', category: 'other' },
+  { code: 'K', name: 'Equity swap or similar', description: 'Transaction in equity swap or similar instrument', category: 'other' },
+  { code: 'L', name: 'Small acquisition (Rule 16a-6)', description: 'Small acquisition under Rule 16a-6', category: 'buy' },
+  { code: 'U', name: 'Tender offer / change of control', description: 'Disposition pursuant to tender offer or change of control', category: 'sell' },
+  { code: 'V', name: 'Voluntary early report', description: 'Voluntarily reported earlier than required', category: 'other' },
+  { code: 'W', name: 'Will or descent', description: 'Acquisition or disposition by will or laws of descent', category: 'other' },
+  { code: 'Z', name: 'Voting trust', description: 'Deposit into or withdrawal from voting trust', category: 'other' },
+  { code: 'Purchase', name: 'Purchase', description: 'Purchase of shares (open market or private)', category: 'buy' },
+  { code: 'Acquisition', name: 'Acquisition', description: 'Acquisition of shares (e.g. grant, award, or purchase)', category: 'buy' },
+  { code: 'Sale', name: 'Sale', description: 'Sale of shares (open market or private)', category: 'sell' },
+  { code: 'Disposition', name: 'Disposition', description: 'Disposition of shares (sale or transfer)', category: 'sell' },
+];
+
+function getInsiderTypeDescription(transactionType: string | null): string {
+  if (!transactionType || typeof transactionType !== 'string') return '';
+  const key = transactionType.trim();
+  const byCode = INSIDER_TRANSACTION_TYPES.find((t) => t.code.toUpperCase() === key.toUpperCase());
+  if (byCode) return byCode.description;
+  const byPartial = INSIDER_TRANSACTION_TYPES.find(
+    (t) => key.toLowerCase().startsWith(t.code.toLowerCase()) || t.code.toLowerCase().startsWith(key.toLowerCase())
+  );
+  return byPartial ? byPartial.description : '';
+}
+
+/** Returns display label: "P – Purchase" for codes, or "Purchase" for word-only, or raw value if unknown */
+function getInsiderTypeLabel(transactionType: string | null): string {
+  if (!transactionType || typeof transactionType !== 'string') return '—';
+  const key = transactionType.trim();
+  const byCode = INSIDER_TRANSACTION_TYPES.find((t) => t.code.toUpperCase() === key.toUpperCase());
+  if (byCode) return byCode.code.length === 1 ? `${byCode.code} – ${byCode.name}` : byCode.name;
+  const byPartial = INSIDER_TRANSACTION_TYPES.find(
+    (t) => key.toLowerCase().startsWith(t.code.toLowerCase()) || t.code.toLowerCase().startsWith(key.toLowerCase())
+  );
+  return byPartial ? (byPartial.code.length === 1 ? `${byPartial.code} – ${byPartial.name}` : byPartial.name) : key;
+}
+
 function groupInsiderTradesByWeek(trades: InsiderTrade[]): InsiderTradeGroup[] {
   const byWeek = new Map<string, InsiderTrade[]>();
   for (const t of trades) {
@@ -168,6 +227,77 @@ function groupInsiderTradesByWeek(trades: InsiderTrade[]): InsiderTradeGroup[] {
   return groups;
 }
 
+interface InsiderTimePeriodData {
+  period: string;
+  label: string;
+  buyShares: number;
+  sellShares: number;
+  buyValue: number;
+  sellValue: number;
+  buyCount: number;
+  sellCount: number;
+  hasData: boolean;
+}
+
+function aggregateInsiderByTimePeriod(trades: InsiderTrade[]): InsiderTimePeriodData[] {
+  const now = new Date();
+  // Non-overlapping time windows
+  const periods = [
+    { period: '1M', label: '0-30d', startDays: 0, endDays: 30 },
+    { period: '3M', label: '1-3mo', startDays: 30, endDays: 90 },
+    { period: '6M', label: '3-6mo', startDays: 90, endDays: 180 },
+    { period: '1Y', label: '6-12mo', startDays: 180, endDays: 365 },
+  ];
+
+  return periods.map(({ period, label, startDays, endDays }) => {
+    const startDate = new Date(now);
+    startDate.setDate(startDate.getDate() - startDays);
+    const endDate = new Date(now);
+    endDate.setDate(endDate.getDate() - endDays);
+
+    let buyShares = 0;
+    let sellShares = 0;
+    let buyValue = 0;
+    let sellValue = 0;
+    let buyCount = 0;
+    let sellCount = 0;
+
+    for (const t of trades) {
+      const dateStr = t.transactionDate || t.filingDate;
+      if (!dateStr) continue;
+      const tradeDate = new Date(dateStr);
+      // Trade must be within the window: endDate <= tradeDate <= startDate
+      if (tradeDate > startDate || tradeDate < endDate) continue;
+
+      const isBuy = t.transactionType && /p|acqui|purchase|buy/i.test(String(t.transactionType));
+      const shares = t.securitiesTransacted ?? 0;
+      const val = t.value ?? 0;
+
+      if (isBuy) {
+        buyShares += shares;
+        buyValue += val;
+        buyCount++;
+      } else {
+        sellShares += shares;
+        sellValue += val;
+        sellCount++;
+      }
+    }
+
+    return {
+      period,
+      label,
+      buyShares,
+      sellShares,
+      buyValue,
+      sellValue,
+      buyCount,
+      sellCount,
+      hasData: buyCount > 0 || sellCount > 0,
+    };
+  });
+}
+
 
 const timeRanges = [
   { label: '1D', value: '1D', interval: '5' },
@@ -191,6 +321,7 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
   const [insiderData, setInsiderData] = useState<InsiderTradingData | null>(null);
   const [insiderLoading, setInsiderLoading] = useState(false);
   const [expandedInsiderWeeks, setExpandedInsiderWeeks] = useState<Set<string>>(new Set());
+  const [showInsiderTypesHelp, setShowInsiderTypesHelp] = useState(false);
   const [performanceData, setPerformanceData] = useState<{
     '1W': number | null;
     '1M': number | null;
@@ -275,7 +406,7 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
   useEffect(() => {
     if (!symbol) return;
     setInsiderLoading(true);
-    fetch(`/api/insider-trading?symbol=${symbol}&limit=30`)
+    fetch(`/api/insider-trading?symbol=${symbol}&limit=100`)
       .then((res) => res.json())
       .then((data) => {
         if (!data.error && data.trades) setInsiderData(data as InsiderTradingData);
@@ -655,6 +786,11 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
           </CardContent>
         </Card>
 
+        {/* Company Profile */}
+        <div className="mb-8">
+          <CompanyProfile symbol={symbol} />
+        </div>
+
         {/* Performance + Related Stocks + 52-Week Range */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 gap-2 lg:col-span-1">
@@ -774,9 +910,6 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
                 {/* Header */}
                 <div className="flex items-start justify-between gap-4 mb-6">
                   <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5">
-                      <DollarSign className="w-5 h-5 text-primary" />
-                    </div>
                     <div>
                       <h2 className="text-lg font-semibold tracking-tight">Valuation Multiples</h2>
                       <p className="text-sm text-muted-foreground">
@@ -1000,36 +1133,34 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
           <RevenueEarningsChart symbol={symbol} />
         </div>
 
-        {/* Balance Sheet Snapshot */}
-        <BalanceSheetSnapshot symbol={symbol} />
-
-        {/* Dividends (and buyback note in Cash Flow) */}
-        <DividendBuyback symbol={symbol} currentPrice={stockData.price} />
-
-        {/* Peer Comparison (margins) */}
-        <PeerComparison symbol={symbol} peerSymbols={[]} maxPeers={2} />
+        {/* Balance Sheet Snapshot + Dividends (side by side) */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
+          <BalanceSheetSnapshot symbol={symbol} />
+          <DividendBuyback symbol={symbol} currentPrice={stockData.price} />
+        </div>
 
         {/* Insider Trading */}
         {(insiderLoading || insiderData !== null) && (
           <Card className="mb-8">
             <CardContent className="pt-6">
-              <h2 className="text-lg font-semibold mb-2 flex items-center gap-2">
-                <UserCheck className="w-5 h-5" />
-                Insider Trading
-              </h2>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <h2 className="text-lg font-semibold">
+                  Insider Trading
+                </h2>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-foreground shrink-0"
+                  onClick={() => setShowInsiderTypesHelp(true)}
+                  aria-label="Explain transaction types"
+                >
+                  <HelpCircle className="w-4 h-4 mr-1.5" />
+                  What do these types mean?
+                </Button>
+              </div>
               <p className="text-xs text-muted-foreground mb-2">
                 Recent SEC-reported transactions by company insiders, grouped by week. Click a week with multiple trades to see each transaction. Data from Financial Modeling Prep.
               </p>
-              <details className="text-xs text-muted-foreground mb-4 group">
-                <summary className="cursor-pointer hover:text-foreground list-none inline-flex items-center gap-1 [&::-webkit-details-marker]:hidden">
-                  <span className="select-none">What do Gift, Exempt, and $0 value mean?</span>
-                </summary>
-                <ul className="mt-2 pl-4 space-y-1 list-disc max-w-xl">
-                  <li><strong>Gift</strong> — The insider transferred shares to someone else (e.g. family, charity) without payment. No cash changed hands, so value is often $0.</li>
-                  <li><strong>Exempt</strong> — A transaction that is exempt from certain SEC rules (e.g. employee plan acquisitions under Rule 16b-3). The type or price may not be reported, so value can be $0.</li>
-                  <li><strong>$0 value</strong> — Gifts, some exempt transactions, and filings that don’t report price show $0. The SEC filing link may have more detail.</li>
-                </ul>
-              </details>
               {insiderLoading ? (
                 <div className="flex justify-center py-12">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -1037,6 +1168,7 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
               ) : insiderData && insiderData.trades.length > 0 ? (
                 (() => {
                   const groups = groupInsiderTradesByWeek(insiderData.trades);
+                  const timePeriodData = aggregateInsiderByTimePeriod(insiderData.trades);
                   const totalBoughtShares = groups.reduce((s, g) => s + g.sharesBought, 0);
                   const totalSoldShares = groups.reduce((s, g) => s + g.sharesSold, 0);
                   const totalBoughtValue = groups.reduce((s, g) => s + g.valueBought, 0);
@@ -1050,10 +1182,30 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
                     if (n >= 1e6) return `$${(n / 1e6).toFixed(0)}M`;
                     return `$${n.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
                   };
+                  const formatCompactValue = (num: number) => {
+                    if (num >= 1e9) return `$${(num / 1e9).toFixed(1)}B`;
+                    if (num >= 1e6) return `$${(num / 1e6).toFixed(1)}M`;
+                    if (num >= 1e3) return `$${(num / 1e3).toFixed(0)}K`;
+                    return `$${num.toFixed(0)}`;
+                  };
+                  // Prepare chart data for Recharts
+                  const chartData = timePeriodData.map((d) => ({
+                    period: d.period,
+                    buy: d.buyValue,
+                    sell: d.sellValue,
+                    buyCount: d.buyCount,
+                    sellCount: d.sellCount,
+                  }));
+                  
                   return (
                     <>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
+                    {/* Side-by-side layout: Weekly Table (left) + Chart (right) */}
+                    <div className="grid grid-cols-1 xl:grid-cols-[1fr,340px] gap-6">
+                      {/* Weekly Breakdown Table */}
+                      <div>
+                        <h3 className="text-sm font-medium text-muted-foreground mb-3">Weekly Breakdown</h3>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b border-border">
                             <th className="w-9 py-2" />
@@ -1137,8 +1289,11 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
                                       <td className="py-1.5 w-9" />
                                       <td className="py-1.5 pl-6 text-muted-foreground whitespace-nowrap">{dateLabel}</td>
                                       <td className="py-1.5 max-w-[180px] truncate" title={t.typeOfOwner ?? undefined}>{t.reportingName ?? '—'}</td>
-                                      <td className={cn('py-1.5 font-medium', isBuy ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400')}>
-                                        {t.transactionType ?? '—'}
+                                      <td
+                                        className={cn('py-1.5 font-medium', isBuy ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400')}
+                                        title={getInsiderTypeDescription(t.transactionType) || undefined}
+                                      >
+                                        {getInsiderTypeLabel(t.transactionType)}
                                       </td>
                                       <td className="py-1.5 text-right tabular-nums">{t.securitiesTransacted != null ? formatShares(t.securitiesTransacted) : '—'}</td>
                                       <td className="py-1.5 text-right tabular-nums">{t.value != null ? formatValue(t.value) : '—'}</td>
@@ -1156,85 +1311,93 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
                             );
                           })}
                         </tbody>
-                      </table>
-                    </div>
-                    <div className="mt-4 pt-4 border-t border-border flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
-                      <div className="text-sm shrink-0">
-                        <div>
-                          <span className="text-muted-foreground">Total bought: </span>
-                          <span className="font-medium text-green-600 dark:text-green-400">
-                            {formatShares(totalBoughtShares)} shares
-                            {totalBoughtValue > 0 && <> · {formatValue(totalBoughtValue)}</>}
-                          </span>
+                          </table>
                         </div>
-                        <div>
-                          <span className="text-muted-foreground">Total sold: </span>
-                          <span className="font-medium text-red-600 dark:text-red-400">
-                            {formatShares(totalSoldShares)} shares
-                            {totalSoldValue > 0 && <> · {formatValue(totalSoldValue)}</>}
-                          </span>
+                        {/* Totals */}
+                        <div className="mt-4 pt-4 border-t border-border">
+                          <div className="text-sm">
+                            <div>
+                              <span className="text-muted-foreground">Total bought: </span>
+                              <span className="font-medium text-green-600 dark:text-green-400">
+                                {formatShares(totalBoughtShares)} shares
+                                {totalBoughtValue > 0 && <> · {formatValue(totalBoughtValue)}</>}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Total sold: </span>
+                              <span className="font-medium text-red-600 dark:text-red-400">
+                                {formatShares(totalSoldShares)} shares
+                                {totalSoldValue > 0 && <> · {formatValue(totalSoldValue)}</>}
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <div className="w-full sm:w-auto min-w-0 sm:min-w-[200px]" style={{ width: '100%', maxWidth: 220, height: 56 }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart
-                            data={(() => {
-                              const maxShares = Math.max(totalBoughtShares, totalSoldShares, 1);
-                              const maxValue = Math.max(totalBoughtValue, totalSoldValue, 1);
-                              return [
-                                {
-                                  name: 'Bought',
-                                  shares: totalBoughtShares,
-                                  value: totalBoughtValue,
-                                  sharesPct: 100 * totalBoughtShares / maxShares,
-                                  valuePct: 100 * totalBoughtValue / maxValue,
-                                  sharesFill: 'hsl(142 76% 55%)',
-                                  valueFill: 'hsl(142 76% 28%)',
-                                },
-                                {
-                                  name: 'Sold',
-                                  shares: totalSoldShares,
-                                  value: totalSoldValue,
-                                  sharesPct: 100 * totalSoldShares / maxShares,
-                                  valuePct: 100 * totalSoldValue / maxValue,
-                                  sharesFill: 'hsl(0 84% 70%)',
-                                  valueFill: 'hsl(0 84% 45%)',
-                                },
-                              ];
-                            })()}
-                            layout="vertical"
-                            margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
-                          >
-                            <XAxis type="number" domain={[0, 200]} hide />
-                            <YAxis type="category" dataKey="name" width={52} tick={{ fontSize: 11 }} />
-                            <Tooltip
-                              content={({ active, payload }) => {
-                                if (!active || !payload?.length) return null;
-                                const p = payload[0].payload;
-                                const isBought = p.name === 'Bought';
-                                return (
-                                  <div className="rounded-md border border-border bg-card px-3 py-2 text-xs shadow-md">
-                                    <div className="font-medium">{p.name}</div>
-                                    <div className={isBought ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
-                                      Shares: {formatShares(p.shares)}
+
+                      {/* Buy vs Sell Bar Chart */}
+                      <div className="bg-muted/30 rounded-lg p-4">
+                        <h3 className="text-sm font-medium text-muted-foreground mb-1">Buy vs Sell by Period</h3>
+                        <p className="text-[10px] text-muted-foreground mb-3">Transaction values per time window</p>
+                        
+                        {/* Legend */}
+                        <div className="flex items-center gap-4 mb-3">
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-3 h-3 rounded-sm bg-emerald-500" />
+                            <span className="text-xs text-muted-foreground">Buys</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-3 h-3 rounded-sm bg-rose-500" />
+                            <span className="text-xs text-muted-foreground">Sells</span>
+                          </div>
+                        </div>
+                        
+                        <div style={{ width: '100%', height: 220 }}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                              data={chartData}
+                              margin={{ top: 10, right: 10, left: 0, bottom: 5 }}
+                              barCategoryGap="20%"
+                            >
+                              <XAxis 
+                                dataKey="period" 
+                                tick={{ fontSize: 11 }}
+                                axisLine={false}
+                                tickLine={false}
+                              />
+                              <YAxis 
+                                tick={{ fontSize: 10 }}
+                                tickFormatter={(value) => {
+                                  if (value >= 1e9) return `$${(value / 1e9).toFixed(0)}B`;
+                                  if (value >= 1e6) return `$${(value / 1e6).toFixed(0)}M`;
+                                  if (value >= 1e3) return `$${(value / 1e3).toFixed(0)}K`;
+                                  return `$${value}`;
+                                }}
+                                axisLine={false}
+                                tickLine={false}
+                                width={50}
+                              />
+                              <Tooltip
+                                content={({ active, payload, label }) => {
+                                  if (!active || !payload?.length) return null;
+                                  const data = payload[0]?.payload;
+                                  return (
+                                    <div className="rounded-md border border-border bg-card px-3 py-2 text-xs shadow-md">
+                                      <div className="font-medium mb-1">{label}</div>
+                                      <div className="text-emerald-600 dark:text-emerald-400">
+                                        Buys: {formatCompactValue(data.buy)} ({data.buyCount} txn{data.buyCount !== 1 ? 's' : ''})
+                                      </div>
+                                      <div className="text-rose-600 dark:text-rose-400">
+                                        Sells: {formatCompactValue(data.sell)} ({data.sellCount} txn{data.sellCount !== 1 ? 's' : ''})
+                                      </div>
                                     </div>
-                                    <div className="text-muted-foreground">Value: {formatValue(p.value)}</div>
-                                  </div>
-                                );
-                              }}
-                            />
-                            <Bar dataKey="sharesPct" stackId="a" radius={[0, 0, 0, 0]}>
-                              {[0, 1].map((i) => (
-                                <Cell key={i} fill={i === 0 ? 'hsl(142 76% 55%)' : 'hsl(0 84% 70%)'} />
-                              ))}
-                            </Bar>
-                            <Bar dataKey="valuePct" stackId="a" radius={[0, 2, 2, 0]}>
-                              {[0, 1].map((i) => (
-                                <Cell key={i} fill={i === 0 ? 'hsl(142 76% 28%)' : 'hsl(0 84% 45%)'} />
-                              ))}
-                            </Bar>
-                          </BarChart>
-                        </ResponsiveContainer>
+                                  );
+                                }}
+                              />
+                              <Bar dataKey="buy" fill="#10b981" radius={[4, 4, 0, 0]} name="Buys" />
+                              <Bar dataKey="sell" fill="#f43f5e" radius={[4, 4, 0, 0]} name="Sells" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
                       </div>
                     </div>
                     </>
@@ -1249,15 +1412,77 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
           </Card>
         )}
 
+        {/* Insider transaction types explanation dialog */}
+        <Dialog open={showInsiderTypesHelp} onOpenChange={setShowInsiderTypesHelp}>
+          <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <HelpCircle className="w-5 h-5" />
+                Insider transaction types
+              </DialogTitle>
+              <DialogDescription>
+                SEC Form 4 uses these codes to classify insider transactions. Hover over a type in the table to see its meaning.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <div>
+                <h4 className="text-sm font-medium text-green-600 dark:text-green-400 mb-2">Acquisitions (buys)</h4>
+                <ul className="text-sm text-muted-foreground space-y-1.5">
+                  {INSIDER_TRANSACTION_TYPES.filter((t) => t.category === 'buy').map((t) => (
+                    <li key={t.code}>
+                      <span className="font-medium text-foreground">
+                        {t.code.length === 1 ? `${t.code} – ${t.name}` : t.name}
+                      </span>
+                      {' — '}{t.description}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <h4 className="text-sm font-medium text-red-600 dark:text-red-400 mb-2">Dispositions (sells)</h4>
+                <ul className="text-sm text-muted-foreground space-y-1.5">
+                  {INSIDER_TRANSACTION_TYPES.filter((t) => t.category === 'sell').map((t) => (
+                    <li key={t.code}>
+                      <span className="font-medium text-foreground">
+                        {t.code.length === 1 ? `${t.code} – ${t.name}` : t.name}
+                      </span>
+                      {' — '}{t.description}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground mb-2">Other</h4>
+                <ul className="text-sm text-muted-foreground space-y-1.5">
+                  {INSIDER_TRANSACTION_TYPES.filter((t) => t.category === 'other').map((t) => (
+                    <li key={t.code}>
+                      <span className="font-medium text-foreground">
+                        {t.code.length === 1 ? `${t.code} – ${t.name}` : t.name}
+                      </span>
+                      {' — '}{t.description}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         {/* SEC Filings */}
-        <SECFilings symbol={symbol} />
+        <div className="mb-8">
+          <SECFilings symbol={symbol} />
+        </div>
+
+        {/* Stock News */}
+        <div className="mb-8">
+          <StockNews symbol={symbol} companyName={stockData.name} limit={6} />
+        </div>
 
         {/* Detailed Information */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <Card>
             <CardContent className="pt-6">
-              <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
-                <BarChart3 className="w-5 h-5" />
+              <h3 className="text-lg font-semibold mb-6">
                 Trading Information
               </h3>
               <div className="space-y-4">
@@ -1283,8 +1508,7 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
 
           <Card>
             <CardContent className="pt-6">
-              <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
-                <DollarSign className="w-5 h-5" />
+              <h3 className="text-lg font-semibold mb-6">
                 Company Metrics
               </h3>
               <div className="space-y-4">

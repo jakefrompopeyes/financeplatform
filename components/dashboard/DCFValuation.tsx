@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Calculator, TrendingUp, TrendingDown, Target, AlertCircle } from 'lucide-react';
+import { TrendingUp, TrendingDown, Target, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface DCFData {
@@ -66,7 +66,7 @@ export default function DCFValuation({ symbol, currentPrice }: { symbol: string;
 
   if (loading) {
     return (
-      <Card className="mb-8">
+      <Card>
         <CardContent className="pt-6">
           <div className="flex justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -92,14 +92,11 @@ export default function DCFValuation({ symbol, currentPrice }: { symbol: string;
   const gaugePercent = ((gaugePosition + 100) / 200) * 100;
 
   return (
-    <Card className="mb-8 overflow-hidden">
+    <Card className="overflow-hidden">
       <CardContent className="pt-6">
         {/* Header */}
         <div className="flex items-start justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-500/5">
-              <Calculator className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-            </div>
             <div>
               <h2 className="text-lg font-semibold tracking-tight">DCF Valuation</h2>
               <p className="text-sm text-muted-foreground">

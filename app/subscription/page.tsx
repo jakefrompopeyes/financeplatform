@@ -255,7 +255,7 @@ export default function SubscriptionPage() {
         <footer className="mt-16 pt-8 border-t border-border">
           <div className="text-center text-sm text-secondary">
             <p>All plans include access to our market dashboard and basic analytics</p>
-            <p className="mt-2">Questions? Email us at support@stonkscan.com</p>
+            <p className="mt-2">Questions? Email us at support@{process.env.NEXT_PUBLIC_SITE_URL ? new URL(process.env.NEXT_PUBLIC_SITE_URL).host : 'stonkscan.com'}</p>
           </div>
         </footer>
       </div>

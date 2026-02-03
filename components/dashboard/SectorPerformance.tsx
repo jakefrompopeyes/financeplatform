@@ -111,7 +111,7 @@ export default function SectorPerformance({ symbol, stockPE: propStockPE }: Sect
 
   if (loading) {
     return (
-      <Card className="mb-8">
+      <Card>
         <CardContent className="pt-6">
           <div className="flex justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -139,7 +139,7 @@ export default function SectorPerformance({ symbol, stockPE: propStockPE }: Sect
   // If we have sector info but no PE data at all, show a simplified card
   if (displayStockPE === null && data.sectorPE === null) {
     return (
-      <Card className="mb-8">
+      <Card>
         <CardContent className="pt-6">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-2.5 rounded-xl bg-gradient-to-br from-indigo-500/20 to-indigo-500/5">
@@ -180,7 +180,7 @@ export default function SectorPerformance({ symbol, stockPE: propStockPE }: Sect
     : data.allSectors || [];
 
   return (
-    <Card className="mb-8 overflow-hidden">
+    <Card className="overflow-hidden">
       <CardContent className="pt-6">
         {/* Header */}
         <div className="flex items-start justify-between gap-4 mb-6">
@@ -417,7 +417,7 @@ export default function SectorPerformance({ symbol, stockPE: propStockPE }: Sect
                   </AreaChart>
                 </ResponsiveContainer>
                 <p className="text-xs text-muted-foreground text-center mt-2">
-                  Dashed line shows {symbol}'s current P/E ({formatPE(stockPE)})
+                  Dashed line shows {symbol}&apos;s current P/E ({formatPE(stockPE)})
                 </p>
               </div>
             ) : (

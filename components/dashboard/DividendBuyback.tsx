@@ -73,7 +73,7 @@ export default function DividendBuyback({ symbol, currentPrice }: { symbol: stri
 
   if (loading) {
     return (
-      <Card className="mb-8 overflow-hidden">
+      <Card className="overflow-hidden">
         <CardContent className="pt-6">
           <h2 className="text-lg font-semibold mb-4">Dividends</h2>
           <div className="h-[280px] flex items-center justify-center text-muted-foreground">
@@ -89,7 +89,7 @@ export default function DividendBuyback({ symbol, currentPrice }: { symbol: stri
 
   if (data.error) {
     return (
-      <Card className="mb-8 overflow-hidden">
+      <Card className="overflow-hidden">
         <CardContent className="pt-6">
           <h2 className="text-lg font-semibold mb-4">Dividends</h2>
           <div className="h-[280px] flex items-center justify-center">
@@ -101,7 +101,7 @@ export default function DividendBuyback({ symbol, currentPrice }: { symbol: stri
   }
 
   return (
-    <Card className="mb-8 overflow-hidden">
+    <Card className="overflow-hidden">
       <CardContent className="pt-6">
         {/* Header */}
         <div className="mb-6">

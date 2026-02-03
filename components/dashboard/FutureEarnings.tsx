@@ -93,7 +93,7 @@ export default function FutureEarnings({
 
   if (loading) {
     return (
-      <Card className="mb-8 overflow-hidden">
+      <Card className="overflow-hidden">
         <CardContent className="pt-6">
           <div className="flex items-center gap-2 mb-4">
             <div className="p-2 rounded-lg bg-primary/10">
@@ -117,7 +117,7 @@ export default function FutureEarnings({
 
   if (data.error && !hasUpcoming && !hasLast) {
     return (
-      <Card className="mb-8 overflow-hidden">
+      <Card className="overflow-hidden">
         <CardContent className="pt-6">
           <div className="flex items-center gap-2 mb-4">
             <div className="p-2 rounded-lg bg-primary/10">
@@ -134,7 +134,7 @@ export default function FutureEarnings({
   }
 
   return (
-    <Card className="mb-8 overflow-hidden">
+    <Card className="overflow-hidden">
       <CardContent className="pt-6">
         {/* Header */}
         <div className="flex items-start justify-between gap-4 mb-6">

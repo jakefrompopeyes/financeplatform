@@ -85,7 +85,7 @@ export default function BalanceSheetSnapshot({ symbol }: { symbol: string }) {
 
   if (loading) {
     return (
-      <Card className="mb-8 overflow-hidden">
+      <Card className="overflow-hidden">
         <CardContent className="pt-6">
           <h2 className="text-lg font-semibold mb-4">Balance Sheet Snapshot</h2>
           <div className="h-[300px] flex items-center justify-center text-muted-foreground">
@@ -101,7 +101,7 @@ export default function BalanceSheetSnapshot({ symbol }: { symbol: string }) {
 
   if (data.error || !period) {
     return (
-      <Card className="mb-8 overflow-hidden">
+      <Card className="overflow-hidden">
         <CardContent className="pt-6">
           <h2 className="text-lg font-semibold mb-4">Balance Sheet Snapshot</h2>
           <div className="h-[300px] flex items-center justify-center">
@@ -127,7 +127,7 @@ export default function BalanceSheetSnapshot({ symbol }: { symbol: string }) {
   const debtToEquity = equity > 0 && debt > 0 ? (debt / equity) : null;
 
   return (
-    <Card className="mb-8 overflow-hidden">
+    <Card className="overflow-hidden">
       <CardContent className="pt-6">
         {/* Header */}
         <div className="flex flex-wrap items-start justify-between gap-4 mb-6">

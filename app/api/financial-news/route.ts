@@ -91,6 +91,41 @@ async function fetchAlphaVantageNews(symbol?: string) {
   }
 }
 
+async function fetchFMPStockNews(symbol: string, limit: number = 20) {
+  const apiKey = process.env.FMP_API_KEY;
+  
+  if (!apiKey) {
+    return [];
+  }
+
+  try {
+    const response = await fetch(
+      `https://financialmodelingprep.com/stable/news/stock?symbol=${symbol}&limit=${limit}&apikey=${apiKey}`,
+      { next: { revalidate: 300 } }
+    );
+
+    if (!response.ok) {
+      return [];
+    }
+
+    const data = await response.json();
+    const articles = Array.isArray(data) ? data : data?.data ?? [];
+    
+    return articles.map((article: any) => ({
+      title: article.title ?? article.headline ?? '',
+      description: article.text?.substring(0, 200) + '...' || article.summary?.substring(0, 200) + '...' || '',
+      url: article.url ?? article.link ?? '',
+      urlToImage: article.image ?? article.banner_image ?? '',
+      publishedAt: article.publishedDate ?? article.published_date ?? article.date ?? '',
+      source: { name: article.site ?? article.source ?? 'FMP' },
+      category: 'stock'
+    }));
+  } catch (error) {
+    console.error('Error fetching from FMP Stock News:', error);
+    return [];
+  }
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const category = searchParams.get('category') || 'all';
@@ -101,11 +136,16 @@ export async function GET(request: Request) {
     let allArticles: NewsArticle[] = [];
     
     if (symbol) {
-      // If a symbol is specified, only fetch from Alpha Vantage (supports ticker filtering)
-      const alphaVantageArticles = await fetchAlphaVantageNews(symbol);
-      allArticles = alphaVantageArticles;
+      // If a symbol is specified, try multiple sources
+      const [alphaVantageArticles, fmpArticles] = await Promise.all([
+        fetchAlphaVantageNews(symbol),
+        fetchFMPStockNews(symbol, limit)
+      ]);
       
-      // If no results from Alpha Vantage, return empty array (no generic news for specific stocks)
+      // Combine results, FMP first as it's more reliable for stock-specific news
+      allArticles = [...fmpArticles, ...alphaVantageArticles];
+      
+      // If no results from any source, return empty with note
       if (allArticles.length === 0) {
         return NextResponse.json({
           articles: [],

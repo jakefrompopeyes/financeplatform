@@ -99,7 +99,7 @@ export default function MarginTrends({ symbol }: { symbol: string }) {
 
   if (loading) {
     return (
-      <Card className="mb-8 overflow-hidden">
+      <Card className="overflow-hidden">
         <CardContent className="pt-6">
           <h2 className="text-lg font-semibold mb-4">Margin Trends</h2>
           <div className="h-[320px] flex items-center justify-center text-muted-foreground">
@@ -115,7 +115,7 @@ export default function MarginTrends({ symbol }: { symbol: string }) {
 
   if (data.error || chartData.length === 0) {
     return (
-      <Card className="mb-8 overflow-hidden">
+      <Card className="overflow-hidden">
         <CardContent className="pt-6">
           <h2 className="text-lg font-semibold mb-4">Margin Trends</h2>
           <div className="h-[320px] flex items-center justify-center">
@@ -127,7 +127,7 @@ export default function MarginTrends({ symbol }: { symbol: string }) {
   }
 
   return (
-    <Card className="mb-8 overflow-hidden">
+    <Card className="overflow-hidden">
       <CardContent className="pt-6">
         {/* Header */}
         <div className="mb-6">

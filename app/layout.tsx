@@ -11,14 +11,16 @@ const inter = Inter({
   weight: ["300", "400", "500", "600"],
 });
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://stonkscan.com";
+
 export const metadata: Metadata = {
   title: "Stonkscan",
-  description: "Real-time financial market analytics and insights | stonkscan.com",
-  metadataBase: new URL("https://stonkscan.com"),
+  description: `Real-time financial market analytics and insights | ${new URL(siteUrl).host}`,
+  metadataBase: new URL(siteUrl),
   openGraph: {
     title: "Stonkscan",
     description: "Real-time financial market analytics and insights",
-    url: "https://stonkscan.com",
+    url: siteUrl,
     siteName: "Stonkscan",
   },
 };

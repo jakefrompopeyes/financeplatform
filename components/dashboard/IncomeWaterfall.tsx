@@ -284,7 +284,7 @@ export default function IncomeWaterfall({ symbol }: { symbol: string }) {
 
   if (loading) {
     return (
-      <Card className="mb-8 overflow-hidden">
+      <Card className="overflow-hidden">
         <CardContent className="pt-6">
           <h2 className="text-lg font-semibold mb-4">Revenue → Earnings Waterfall</h2>
           <div className="h-[340px] flex items-center justify-center text-muted-foreground">
@@ -300,7 +300,7 @@ export default function IncomeWaterfall({ symbol }: { symbol: string }) {
 
   if (data.error || data.periods.length === 0) {
     return (
-      <Card className="mb-8 overflow-hidden">
+      <Card className="overflow-hidden">
         <CardContent className="pt-6">
           <h2 className="text-lg font-semibold mb-4">Revenue → Earnings Waterfall</h2>
           <div className="h-[340px] flex items-center justify-center">
@@ -319,7 +319,7 @@ export default function IncomeWaterfall({ symbol }: { symbol: string }) {
     : null;
 
   return (
-    <Card className="mb-8 overflow-hidden">
+    <Card className="overflow-hidden">
       <CardContent className="pt-6">
         {/* Header */}
         <div className="flex flex-wrap items-start justify-between gap-4 mb-6">

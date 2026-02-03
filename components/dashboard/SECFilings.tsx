@@ -70,7 +70,7 @@ export default function SECFilings({ symbol }: { symbol: string }) {
 
   if (loading) {
     return (
-      <Card className="mb-8">
+      <Card>
         <CardContent className="pt-6">
           <div className="flex justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -83,7 +83,7 @@ export default function SECFilings({ symbol }: { symbol: string }) {
   // Show plan limitation message
   if (planLimited && error) {
     return (
-      <Card className="mb-8">
+      <Card>
         <CardContent className="pt-6">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5">
@@ -144,7 +144,7 @@ export default function SECFilings({ symbol }: { symbol: string }) {
   };
 
   return (
-    <Card className="mb-8">
+    <Card>
       <CardContent className="pt-6">
         <div className="flex items-center gap-3 mb-4">
           <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5">
