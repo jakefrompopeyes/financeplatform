@@ -8,7 +8,6 @@ import {
   Cell,
   ResponsiveContainer,
   Tooltip,
-  Legend,
 } from 'recharts';
 
 interface ProductSegment {
@@ -119,41 +118,6 @@ const CustomTooltip = ({
   );
 };
 
-// Custom legend component
-const CustomLegend = ({ 
-  payload,
-  total 
-}: { 
-  payload?: Array<{ value: string; color: string; payload: { value: number } }>; 
-  total: number;
-}) => {
-  if (!payload) return null;
-  
-  return (
-    <div className="flex flex-wrap gap-x-4 gap-y-1 justify-center mt-2">
-      {payload.slice(0, 6).map((entry, index) => (
-        <div key={index} className="flex items-center gap-1.5">
-          <div 
-            className="w-2.5 h-2.5 rounded-full flex-shrink-0" 
-            style={{ backgroundColor: entry.color }} 
-          />
-          <span className="text-xs text-muted-foreground truncate max-w-[100px]" title={entry.value}>
-            {truncateName(entry.value, 15)}
-          </span>
-          <span className="text-xs text-foreground font-medium">
-            {formatPercent(entry.payload.value, total)}
-          </span>
-        </div>
-      ))}
-      {payload.length > 6 && (
-        <span className="text-xs text-muted-foreground">
-          +{payload.length - 6} more
-        </span>
-      )}
-    </div>
-  );
-};
-
 export default function RevenueSegmentation({ symbol }: { symbol: string }) {
   const [data, setData] = useState<RevenueSegmentationData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -251,7 +215,7 @@ export default function RevenueSegmentation({ symbol }: { symbol: string }) {
     <Card className="overflow-hidden">
       <CardContent className="pt-6">
         {/* Header */}
-        <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
           <div>
             <h2 className="text-lg font-semibold tracking-tight">Revenue Breakdown</h2>
             <p className="text-sm text-muted-foreground mt-1">
@@ -259,12 +223,12 @@ export default function RevenueSegmentation({ symbol }: { symbol: string }) {
             </p>
           </div>
           {hasMultipleYears && data?.years && (
-            <div className="flex gap-1.5 p-1 bg-muted/50 rounded-lg">
+            <div className="flex flex-wrap gap-1.5 p-1.5 bg-muted/50 rounded-lg max-w-full">
               {data.years.map((yearData, i) => (
                 <button
                   key={yearData.year}
                   onClick={() => setSelectedYearIndex(i)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+                  className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-all duration-200 shrink-0 ${
                     selectedYearIndex === i
                       ? 'bg-background text-foreground shadow-sm'
                       : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
@@ -278,23 +242,23 @@ export default function RevenueSegmentation({ symbol }: { symbol: string }) {
         </div>
 
         {/* Charts Grid */}
-        <div className={`grid gap-6 ${hasProductData && hasGeoData ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
+        <div className={`grid gap-4 ${hasProductData && hasGeoData ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
           {/* Product Segmentation */}
           {hasProductData && (
-            <div className="bg-muted/30 rounded-lg p-4">
-              <h3 className="text-sm font-medium text-foreground mb-1">By Product/Service</h3>
-              <p className="text-xs text-muted-foreground mb-4">
+            <div className="bg-muted/30 rounded-lg p-4 min-h-0 flex flex-col">
+              <h3 className="text-sm font-medium text-foreground mb-0.5">By Product/Service</h3>
+              <p className="text-xs text-muted-foreground mb-3">
                 Total: {formatLargeNumber(productTotal)}
               </p>
-              <div className="h-[220px]">
+              <div className="flex-1 min-h-[200px] w-full" style={{ height: 240 }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
+                  <PieChart margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
                     <Pie
                       data={productChartData}
                       cx="50%"
-                      cy="45%"
-                      innerRadius={50}
-                      outerRadius={80}
+                      cy="50%"
+                      innerRadius="55%"
+                      outerRadius="85%"
                       paddingAngle={2}
                       dataKey="value"
                       stroke="hsl(var(--background))"
@@ -309,7 +273,6 @@ export default function RevenueSegmentation({ symbol }: { symbol: string }) {
                       ))}
                     </Pie>
                     <Tooltip content={<CustomTooltip total={productTotal} type="product" />} />
-                    <Legend content={<CustomLegend total={productTotal} />} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -318,20 +281,20 @@ export default function RevenueSegmentation({ symbol }: { symbol: string }) {
 
           {/* Geographic Segmentation */}
           {hasGeoData && (
-            <div className="bg-muted/30 rounded-lg p-4">
-              <h3 className="text-sm font-medium text-foreground mb-1">By Geography</h3>
-              <p className="text-xs text-muted-foreground mb-4">
+            <div className="bg-muted/30 rounded-lg p-4 min-h-0 flex flex-col">
+              <h3 className="text-sm font-medium text-foreground mb-0.5">By Geography</h3>
+              <p className="text-xs text-muted-foreground mb-3">
                 Total: {formatLargeNumber(geoTotal)}
               </p>
-              <div className="h-[220px]">
+              <div className="flex-1 min-h-[200px] w-full" style={{ height: 240 }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
+                  <PieChart margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
                     <Pie
                       data={geoChartData}
                       cx="50%"
-                      cy="45%"
-                      innerRadius={50}
-                      outerRadius={80}
+                      cy="50%"
+                      innerRadius="55%"
+                      outerRadius="85%"
                       paddingAngle={2}
                       dataKey="value"
                       stroke="hsl(var(--background))"
@@ -346,7 +309,6 @@ export default function RevenueSegmentation({ symbol }: { symbol: string }) {
                       ))}
                     </Pie>
                     <Tooltip content={<CustomTooltip total={geoTotal} type="geo" />} />
-                    <Legend content={<CustomLegend total={geoTotal} />} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>

@@ -22,7 +22,6 @@ import CashFlowWaterfall from '@/components/dashboard/CashFlowWaterfall';
 import MarginTrends from '@/components/dashboard/MarginTrends';
 import RevenueEarningsChart from '@/components/dashboard/RevenueEarningsChart';
 import BalanceSheetSnapshot from '@/components/dashboard/BalanceSheetSnapshot';
-import SECFilings from '@/components/dashboard/SECFilings';
 import DCFValuation from '@/components/dashboard/DCFValuation';
 import FuturePriceModel from '@/components/dashboard/FuturePriceModel';
 import RevenueSegmentation from '@/components/dashboard/RevenueSegmentation';
@@ -1199,8 +1198,18 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
                 </div>
               ) : insiderData && insiderData.trades.length > 0 ? (
                 (() => {
-                  const groups = groupInsiderTradesByWeek(insiderData.trades);
-                  const timePeriodData = aggregateInsiderByTimePeriod(insiderData.trades);
+                  const buysAndSellsOnly = insiderData.trades.filter(
+                    (t) => isBuyTransaction(t.transactionType) || isSellTransaction(t.transactionType)
+                  );
+                  if (buysAndSellsOnly.length === 0) {
+                    return (
+                      <p className="text-sm text-muted-foreground py-6 text-center">
+                        No buy or sell transactions in the recent data. Other transaction types (e.g. grants, exercises) are not shown.
+                      </p>
+                    );
+                  }
+                  const groups = groupInsiderTradesByWeek(buysAndSellsOnly);
+                  const timePeriodData = aggregateInsiderByTimePeriod(buysAndSellsOnly);
                   const totalBoughtShares = groups.reduce((s, g) => s + g.sharesBought, 0);
                   const totalSoldShares = groups.reduce((s, g) => s + g.sharesSold, 0);
                   const totalBoughtValue = groups.reduce((s, g) => s + g.valueBought, 0);
@@ -1500,11 +1509,6 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
             </div>
           </DialogContent>
         </Dialog>
-
-        {/* SEC Filings */}
-        <div className="mb-8">
-          <SECFilings symbol={symbol} />
-        </div>
 
         {/* Stock News */}
         <div className="mb-8">

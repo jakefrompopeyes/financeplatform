@@ -70,14 +70,28 @@ export async function GET(request: Request) {
       geoData = Array.isArray(json) ? json : [];
     }
 
+    /** Parse year from API item: prefer calendarYear/year field, else YYYY from date string (ISO) to avoid timezone bugs. */
+    function parseYear(item: Record<string, unknown>): number | null {
+      const cal = item.calendarYear ?? item.year ?? item.fiscalYear;
+      if (typeof cal === 'number' && cal >= 1990 && cal <= 2030) return cal;
+      const date = item.date as string | undefined;
+      if (!date || typeof date !== 'string') return null;
+      // ISO date YYYY-MM-DD: use first 4 chars to avoid timezone/locale issues with new Date()
+      const isoMatch = date.match(/^(\d{4})-\d{2}-\d{2}/);
+      if (isoMatch) return parseInt(isoMatch[1], 10);
+      const d = new Date(date);
+      if (!Number.isNaN(d.getTime())) return d.getFullYear();
+      return null;
+    }
+
     // Group product data by year
     const productByYear = new Map<number, { date: string; segments: ProductSegment[] }>();
     
     for (const item of productData) {
-      const date = item.date as string | undefined;
-      if (!date) continue;
+      const year = parseYear(item);
+      if (year == null) continue;
       
-      const year = new Date(date).getFullYear();
+      const date = (item.date as string) || `${year}-12-31`;
       
       if (!productByYear.has(year)) {
         productByYear.set(year, { date, segments: [] });
@@ -86,10 +100,9 @@ export async function GET(request: Request) {
       const yearData = productByYear.get(year)!;
       
       for (const [key, value] of Object.entries(item)) {
-        if (key !== 'date' && key !== 'symbol' && typeof value === 'object' && value !== null) {
+        if (key !== 'date' && key !== 'symbol' && key !== 'calendarYear' && key !== 'year' && key !== 'fiscalYear' && typeof value === 'object' && value !== null) {
           for (const [segmentName, revenue] of Object.entries(value as Record<string, unknown>)) {
             if (typeof revenue === 'number' && revenue > 0) {
-              // Check if segment already exists for this year
               const existing = yearData.segments.find(s => s.segment === segmentName);
               if (existing) {
                 existing.revenue += revenue;
@@ -106,10 +119,10 @@ export async function GET(request: Request) {
     const geoByYear = new Map<number, { date: string; segments: GeoSegment[] }>();
     
     for (const item of geoData) {
-      const date = item.date as string | undefined;
-      if (!date) continue;
+      const year = parseYear(item);
+      if (year == null) continue;
       
-      const year = new Date(date).getFullYear();
+      const date = (item.date as string) || `${year}-12-31`;
       
       if (!geoByYear.has(year)) {
         geoByYear.set(year, { date, segments: [] });
@@ -118,10 +131,9 @@ export async function GET(request: Request) {
       const yearData = geoByYear.get(year)!;
       
       for (const [key, value] of Object.entries(item)) {
-        if (key !== 'date' && key !== 'symbol' && typeof value === 'object' && value !== null) {
+        if (key !== 'date' && key !== 'symbol' && key !== 'calendarYear' && key !== 'year' && key !== 'fiscalYear' && typeof value === 'object' && value !== null) {
           for (const [regionName, revenue] of Object.entries(value as Record<string, unknown>)) {
             if (typeof revenue === 'number' && revenue > 0) {
-              // Check if region already exists for this year
               const existing = yearData.segments.find(s => s.region === regionName);
               if (existing) {
                 existing.revenue += revenue;
