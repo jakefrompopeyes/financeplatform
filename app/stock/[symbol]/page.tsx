@@ -22,10 +22,10 @@ import CashFlowWaterfall from '@/components/dashboard/CashFlowWaterfall';
 import MarginTrends from '@/components/dashboard/MarginTrends';
 import RevenueEarningsChart from '@/components/dashboard/RevenueEarningsChart';
 import BalanceSheetSnapshot from '@/components/dashboard/BalanceSheetSnapshot';
-import DividendBuyback from '@/components/dashboard/DividendBuyback';
 import SECFilings from '@/components/dashboard/SECFilings';
 import DCFValuation from '@/components/dashboard/DCFValuation';
 import FuturePriceModel from '@/components/dashboard/FuturePriceModel';
+import RevenueSegmentation from '@/components/dashboard/RevenueSegmentation';
 import Link from 'next/link';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import TradingViewWidget, { AVAILABLE_INDICATORS, IndicatorId } from '@/components/TradingViewWidget';
@@ -161,6 +161,34 @@ function getInsiderTypeDescription(transactionType: string | null): string {
   return byPartial ? byPartial.description : '';
 }
 
+/** Returns true only for actual purchases (P code or "Purchase" word) */
+function isBuyTransaction(transactionType: string | null | undefined): boolean {
+  if (!transactionType || typeof transactionType !== 'string') return false;
+  const key = transactionType.trim().toUpperCase();
+  // Only count actual purchases:
+  // - "P" code or strings starting with "P-" or "P " (like "P-Purchase", "P – Purchase")
+  // - Contains "PURCHASE" anywhere in the string
+  if (key === 'P') return true;
+  if (key.startsWith('P-') || key.startsWith('P ')) return true;
+  if (key.includes('PURCHASE')) return true;
+  return false;
+}
+
+/** Returns true only for actual sales (S code or "Sale"/"Sell" word) */
+function isSellTransaction(transactionType: string | null | undefined): boolean {
+  if (!transactionType || typeof transactionType !== 'string') return false;
+  const key = transactionType.trim().toUpperCase();
+  // Only count actual sales:
+  // - "S" code or strings starting with "S-" or "S " (like "S-Sale", "S – Sale")
+  // - Contains "SALE" or "SELL" anywhere in the string
+  // - "D" (Disposition) from acquistionOrDisposition field
+  if (key === 'S' || key === 'D') return true;
+  if (key.startsWith('S-') || key.startsWith('S ')) return true;
+  if (key.includes('SALE') || key.includes('SELL')) return true;
+  if (key === 'DISPOSITION') return true;
+  return false;
+}
+
 /** Returns display label: "P – Purchase" for codes, or "Purchase" for word-only, or raw value if unknown */
 function getInsiderTypeLabel(transactionType: string | null): string {
   if (!transactionType || typeof transactionType !== 'string') return '—';
@@ -194,18 +222,20 @@ function groupInsiderTradesByWeek(trades: InsiderTrade[]): InsiderTradeGroup[] {
     const names = new Set<string>();
     let firstLink: string | null = null;
     for (const t of weekTrades) {
-      const isBuy = t.transactionType && /p|acqui|purchase|buy/i.test(String(t.transactionType));
+      const isBuy = isBuyTransaction(t.transactionType);
+      const isSell = isSellTransaction(t.transactionType);
       const shares = t.securitiesTransacted ?? 0;
       const val = t.value ?? 0;
       if (isBuy) {
         buyCount++;
         sharesBought += shares;
         valueBought += val;
-      } else {
+      } else if (isSell) {
         sellCount++;
         sharesSold += shares;
         valueSold += val;
       }
+      // Skip other transaction types (grants, exercises, etc.)
       if (t.reportingName) names.add(t.reportingName);
       if (t.link && !firstLink) firstLink = t.link;
     }
@@ -269,7 +299,8 @@ function aggregateInsiderByTimePeriod(trades: InsiderTrade[]): InsiderTimePeriod
       // Trade must be within the window: endDate <= tradeDate <= startDate
       if (tradeDate > startDate || tradeDate < endDate) continue;
 
-      const isBuy = t.transactionType && /p|acqui|purchase|buy/i.test(String(t.transactionType));
+      const isBuy = isBuyTransaction(t.transactionType);
+      const isSell = isSellTransaction(t.transactionType);
       const shares = t.securitiesTransacted ?? 0;
       const val = t.value ?? 0;
 
@@ -277,11 +308,12 @@ function aggregateInsiderByTimePeriod(trades: InsiderTrade[]): InsiderTimePeriod
         buyShares += shares;
         buyValue += val;
         buyCount++;
-      } else {
+      } else if (isSell) {
         sellShares += shares;
         sellValue += val;
         sellCount++;
       }
+      // Skip other transaction types (grants, exercises, etc.)
     }
 
     return {
@@ -1133,10 +1165,10 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
           <RevenueEarningsChart symbol={symbol} />
         </div>
 
-        {/* Balance Sheet Snapshot + Dividends (side by side) */}
+        {/* Balance Sheet Snapshot + Revenue Breakdown (side by side) */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
           <BalanceSheetSnapshot symbol={symbol} />
-          <DividendBuyback symbol={symbol} currentPrice={stockData.price} />
+          <RevenueSegmentation symbol={symbol} />
         </div>
 
         {/* Insider Trading */}
@@ -1283,14 +1315,15 @@ export default function StockPage({ params }: { params: { symbol: string } }) {
                                 {isExpanded && g.weekTrades.map((t, i) => {
                                   const dateStr = t.transactionDate || t.filingDate;
                                   const dateLabel = dateStr ? new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
-                                  const isBuy = t.transactionType && /p|acqui|purchase|buy/i.test(String(t.transactionType));
+                                  const isBuy = isBuyTransaction(t.transactionType);
+                                  const isSell = isSellTransaction(t.transactionType);
                                   return (
                                     <tr key={`${g.weekKey}-${i}`} className="border-b border-border/30 bg-muted/20 hover:bg-muted/30">
                                       <td className="py-1.5 w-9" />
                                       <td className="py-1.5 pl-6 text-muted-foreground whitespace-nowrap">{dateLabel}</td>
                                       <td className="py-1.5 max-w-[180px] truncate" title={t.typeOfOwner ?? undefined}>{t.reportingName ?? '—'}</td>
                                       <td
-                                        className={cn('py-1.5 font-medium', isBuy ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400')}
+                                        className={cn('py-1.5 font-medium', isBuy ? 'text-green-600 dark:text-green-400' : isSell ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground')}
                                         title={getInsiderTypeDescription(t.transactionType) || undefined}
                                       >
                                         {getInsiderTypeLabel(t.transactionType)}
