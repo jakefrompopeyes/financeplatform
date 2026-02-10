@@ -3,6 +3,13 @@ import { NextResponse } from 'next/server';
 const FRED_API_KEY = process.env.FRED_API_KEY;
 const BASE_URL = 'https://api.stlouisfed.org/fred/series/observations';
 
+interface SeriesConfig {
+  seriesId: string;
+  units?: string;
+  limit: string;
+  transform?: (value: number) => number;
+}
+
 export async function GET() {
   try {
     if (!FRED_API_KEY || FRED_API_KEY === 'your_api_key_here') {
@@ -12,75 +19,70 @@ export async function GET() {
       );
     }
 
-    // FRED Series IDs for economic indicators
-    const seriesIds = {
-      cpi: 'CPIAUCSL',           // Consumer Price Index for All Urban Consumers
-      unemployment: 'UNRATE',     // Unemployment Rate
-      fedFunds: 'FEDFUNDS'        // Federal Funds Effective Rate
+    // FRED Series configurations
+    // Limits tuned per data frequency: monthly ~36 (~3yr), weekly ~156 (~3yr), quarterly ~12 (~3yr)
+    const seriesConfigs: Record<string, SeriesConfig> = {
+      cpi:              { seriesId: 'CPIAUCSL',        units: 'pc1', limit: '36' },
+      corePCE:          { seriesId: 'PCEPILFE',        units: 'pc1', limit: '36' },
+      gdp:              { seriesId: 'A191RL1Q225SBEA',                limit: '12' },
+      unemployment:     { seriesId: 'UNRATE',                         limit: '36' },
+      joblessClaims:    { seriesId: 'ICSA',                           limit: '156', transform: (v) => v / 1000 },
+      federalFundsRate: { seriesId: 'FEDFUNDS',                       limit: '36' },
+      mortgageRate:     { seriesId: 'MORTGAGE30US',                   limit: '156' },
+      nfci:             { seriesId: 'NFCI',                           limit: '156' },
+      fedBalanceSheet:  { seriesId: 'WALCL',                          limit: '156', transform: (v) => v / 1000000 },
     };
 
-    // Fetch CPI with FRED's "Percent Change from Year Ago" (pc1) for official YoY inflation
-    const fetchSeries = async (seriesId: string, units?: string) => {
+    const fetchSeries = async (config: SeriesConfig) => {
       const params = new URLSearchParams({
-        series_id: seriesId,
-        api_key: FRED_API_KEY,
+        series_id: config.seriesId,
+        api_key: FRED_API_KEY!,
         file_type: 'json',
         sort_order: 'desc',
-        limit: '36'
+        limit: config.limit,
       });
-      if (units) params.set('units', units);
-      const response = await fetch(
-        `${BASE_URL}?${params.toString()}`,
-        { headers: { Accept: 'application/json' } }
-      );
+      if (config.units) params.set('units', config.units);
+
+      const response = await fetch(`${BASE_URL}?${params.toString()}`, {
+        headers: { Accept: 'application/json' },
+      });
       if (!response.ok) {
-        throw new Error(`FRED API error for ${seriesId}: ${response.status}`);
+        throw new Error(`FRED API error for ${config.seriesId}: ${response.status}`);
       }
       return response.json();
     };
 
-    const [cpiData, unemploymentData, fedFundsData] = await Promise.all([
-      fetchSeries(seriesIds.cpi, 'pc1'), // YoY % change directly from FRED (~2.7%)
-      fetchSeries(seriesIds.unemployment),
-      fetchSeries(seriesIds.fedFunds)
-    ]);
+    const keys = Object.keys(seriesConfigs);
+    const responses = await Promise.all(keys.map((key) => fetchSeries(seriesConfigs[key])));
 
-    // Transform data to our format
-    const transformData = (data: any) => {
+    const transformData = (data: any, transform?: (v: number) => number) => {
       if (!data.observations || !Array.isArray(data.observations)) {
         return { current: 0, historical: [] };
       }
 
       const observations = data.observations
         .filter((obs: any) => obs.value !== '.')
-        .map((obs: any) => ({
-          date: obs.date,
-          value: parseFloat(obs.value)
-        }))
-        .reverse(); // Oldest to newest
+        .map((obs: any) => {
+          const raw = parseFloat(obs.value);
+          return {
+            date: obs.date,
+            value: transform ? transform(raw) : raw,
+          };
+        })
+        .reverse(); // Oldest to newest for charts
 
       return {
-        current: observations[observations.length - 1]?.value || 0,
-        historical: observations
+        current: observations[observations.length - 1]?.value ?? 0,
+        historical: observations,
       };
     };
 
-    // CPI is already YoY inflation rate (units=pc1); no manual calculation
-    const cpiTransformed = transformData(cpiData);
+    const result: Record<string, any> = {};
+    keys.forEach((key, i) => {
+      result[key] = transformData(responses[i], seriesConfigs[key].transform);
+    });
 
-    const result = {
-      cpi: {
-        current: cpiTransformed.current,
-        historical: cpiTransformed.historical
-      },
-      unemployment: transformData(unemploymentData),
-      federalFundsRate: transformData(fedFundsData)
-    };
-
-    console.log('FRED Economic Data fetched successfully');
-    console.log(`CPI (Inflation): ${result.cpi.current.toFixed(2)}%`);
-    console.log(`Unemployment: ${result.unemployment.current.toFixed(2)}%`);
-    console.log(`Fed Funds: ${result.federalFundsRate.current.toFixed(2)}%`);
+    console.log('FRED Economic Data fetched successfully (9 indicators)');
 
     return NextResponse.json(result);
   } catch (error) {
@@ -91,7 +93,3 @@ export async function GET() {
     );
   }
 }
-
-
-
-

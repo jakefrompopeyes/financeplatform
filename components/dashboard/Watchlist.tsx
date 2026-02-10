@@ -59,8 +59,19 @@ export default function Watchlist({ onSelectAsset, recentlyViewed = [] }: Watchl
         { symbol: 'AAPL', type: 'stock' },
         { symbol: 'GOOGL', type: 'stock' },
         { symbol: 'MSFT', type: 'stock' },
+        { symbol: 'AMZN', type: 'stock' },
+        { symbol: 'NVDA', type: 'stock' },
+        { symbol: 'TSLA', type: 'stock' },
+        { symbol: 'META', type: 'stock' },
+        { symbol: 'NFLX', type: 'stock' },
+        { symbol: 'JPM', type: 'stock' },
+        { symbol: 'V', type: 'stock' },
         { symbol: 'BTC', type: 'crypto' },
         { symbol: 'ETH', type: 'crypto' },
+        { symbol: 'SOL', type: 'crypto' },
+        { symbol: 'XRP', type: 'crypto' },
+        { symbol: 'ADA', type: 'crypto' },
+        { symbol: 'DOGE', type: 'crypto' },
       ]);
     }
   }, []);
@@ -258,8 +269,8 @@ export default function Watchlist({ onSelectAsset, recentlyViewed = [] }: Watchl
   };
 
   return (
-    <div className="sticky top-8">
-      <Card className="p-4">
+    <div>
+      <Card className="p-4 border-0 shadow-none">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold transition-all duration-300">
             {viewMode === 'watchlist' ? 'Watchlist' : 'Recently Viewed'}

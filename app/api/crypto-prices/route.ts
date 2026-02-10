@@ -84,6 +84,8 @@ export async function GET() {
             sparkline7d: sparkline7d,
             high24h: coin.high_24h,
             low24h: coin.low_24h,
+            ath: coin.ath ?? null,
+            atl: coin.atl ?? null,
           };
         } catch (error) {
           console.error(`Error fetching chart for ${coin.id}:`, error);
@@ -102,6 +104,8 @@ export async function GET() {
             sparkline7d: [],
             high24h: coin.high_24h,
             low24h: coin.low_24h,
+            ath: coin.ath ?? null,
+            atl: coin.atl ?? null,
           };
         }
       })

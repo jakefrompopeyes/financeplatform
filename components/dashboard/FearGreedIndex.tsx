@@ -70,7 +70,7 @@ interface BitcoinHistoricalData {
   currentPrice: number;
 }
 
-export default function FearGreedIndex() {
+export default function FearGreedIndex({ compact = false }: { compact?: boolean } = {}) {
   const [data, setData] = useState<FearGreedData | null>(null);
   const [sentimentData, setSentimentData] = useState<MarketSentimentData | null>(null);
   const [bitcoinData, setBitcoinData] = useState<BitcoinHistoricalData | null>(null);
@@ -138,15 +138,15 @@ export default function FearGreedIndex() {
   if (loading) {
     return (
       <div className="space-y-4">
-        <h2 className="text-2xl font-normal text-foreground">Market Sentiment</h2>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {[1, 2, 3, 4].map((i) => (
+        <h2 className="text-2xl font-normal text-foreground">{compact ? 'Sentiment' : 'Market Sentiment'}</h2>
+        <div className={compact ? 'space-y-3' : 'grid grid-cols-1 lg:grid-cols-2 gap-6'}>
+          {(compact ? [1] : [1, 2, 3, 4]).map((i) => (
             <Card key={i} className="animate-pulse">
               <CardHeader>
                 <div className="h-6 bg-muted rounded w-48"></div>
               </CardHeader>
               <CardContent>
-                <div className="h-64 bg-muted rounded"></div>
+                <div className={`${compact ? 'h-40' : 'h-64'} bg-muted rounded`}></div>
               </CardContent>
             </Card>
           ))}
@@ -158,7 +158,7 @@ export default function FearGreedIndex() {
   if (!data) {
     return (
       <div className="space-y-4">
-        <h2 className="text-2xl font-normal text-foreground">Market Sentiment</h2>
+        <h2 className="text-2xl font-normal text-foreground">{compact ? 'Sentiment' : 'Market Sentiment'}</h2>
         <Card>
           <CardContent className="py-8">
             <div className="text-center text-muted-foreground">
@@ -186,6 +186,75 @@ export default function FearGreedIndex() {
       btcPercentChange: btcItem?.percentChange || null,
     };
   });
+
+  // ── Compact mode: gauge + VIX + P/C summary ──
+  if (compact) {
+    return (
+      <div className="space-y-4">
+        <h2 className="text-2xl font-normal text-foreground">Sentiment</h2>
+
+        {/* Gauge Card */}
+        <Card>
+          <CardHeader className="pb-1">
+            <CardTitle className="text-base font-normal text-secondary">
+              Fear & Greed Index
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pb-4">
+            <div className="relative flex flex-col items-center justify-center py-2">
+              <div className="relative w-48 h-24">
+                <svg viewBox="0 0 200 100" className="w-full h-full">
+                  <path d="M 10,100 A 90,90 0 0,1 27,47" fill="none" stroke="#EA3943" strokeWidth="20" opacity="0.3" />
+                  <path d="M 27,47 A 90,90 0 0,1 72,14" fill="none" stroke="#F5A623" strokeWidth="20" opacity="0.3" />
+                  <path d="M 72,14 A 90,90 0 0,1 128,14" fill="none" stroke="#F8E71C" strokeWidth="20" opacity="0.3" />
+                  <path d="M 128,14 A 90,90 0 0,1 173,47" fill="none" stroke="#7ED321" strokeWidth="20" opacity="0.3" />
+                  <path d="M 173,47 A 90,90 0 0,1 190,100" fill="none" stroke="#50E3C2" strokeWidth="20" opacity="0.3" />
+                  <g transform={`rotate(${rotation} 100 100)`}>
+                    <line x1="100" y1="100" x2="100" y2="20" stroke={color} strokeWidth="3" strokeLinecap="round" />
+                    <circle cx="100" cy="100" r="5" fill={color} />
+                  </g>
+                </svg>
+              </div>
+              <div className="text-center mt-1">
+                <div className="text-4xl font-light" style={{ color }}>
+                  <FlipInteger value={data.current.value} />
+                </div>
+                <div className="text-base font-medium" style={{ color }}>
+                  {data.current.rating}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* VIX + P/C compact summary */}
+        <div className="grid grid-cols-2 gap-3">
+          {sentimentData?.vix && (
+            <Card className="p-4">
+              <p className="text-xs font-medium text-muted-foreground mb-1">VIX</p>
+              <p className="text-2xl font-light text-foreground">
+                <FlipNumber value={sentimentData.vix.current} decimals={2} />
+              </p>
+              <p className={`text-xs mt-1 ${sentimentData.vix.change >= 0 ? 'text-red-500' : 'text-green-500'}`}>
+                {sentimentData.vix.change >= 0 ? '▲' : '▼'} {Math.abs(sentimentData.vix.changePercent).toFixed(2)}%
+              </p>
+            </Card>
+          )}
+          {sentimentData?.putCall && (
+            <Card className="p-4">
+              <p className="text-xs font-medium text-muted-foreground mb-1">Put/Call</p>
+              <p className="text-2xl font-light text-foreground">
+                <FlipNumber value={sentimentData.putCall.current} decimals={3} />
+              </p>
+              <p className={`text-xs mt-1 ${sentimentData.putCall.change >= 0 ? 'text-amber-500' : 'text-blue-500'}`}>
+                {sentimentData.putCall.change >= 0 ? '▲' : '▼'} {Math.abs(sentimentData.putCall.changePercent).toFixed(2)}%
+              </p>
+            </Card>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
